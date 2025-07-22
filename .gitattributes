@@ -1,0 +1,95 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf
+*.rst text eol=lf
+
+# Configuration files
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+
+# LaTeX files
+*.tex text eol=lf
+*.bib text eol=lf
+*.bst text eol=lf
+*.cls text eol=lf
+*.sty text eol=lf
+*.ist text eol=lf
+
+# Data files (binary)
+*.npy binary
+*.npz binary
+*.pkl binary
+*.pickle binary
+*.h5 binary
+*.hdf5 binary
+
+# Image files (binary)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tiff binary
+*.svg text eol=lf
+
+# Archive files (binary)
+*.zip binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.7z binary
+
+# Executable files
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Large files that should be tracked with Git LFS (if needed)
+# Uncomment these if you want to use Git LFS for large files
+# *.npy filter=lfs diff=lfs merge=lfs -text
+# *.npz filter=lfs diff=lfs merge=lfs -text
+# *.pkl filter=lfs diff=lfs merge=lfs -text
+# *.h5 filter=lfs diff=lfs merge=lfs -text
+
+# Scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Web files
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.xml text eol=lf
+
+# CSV files
+*.csv text eol=lf
+
+# TSV files
+*.tsv text eol=lf
+
+# Log files
+*.log text eol=lf
+
+# Requirements and setup files
+requirements.txt text eol=lf
+setup.py text eol=lf
+pyproject.toml text eol=lf
+Pipfile text eol=lf
+Pipfile.lock text eol=lf
+
+# Documentation
+README.md text eol=lf
+CHANGELOG.md text eol=lf
+LICENSE text eol=lf 
