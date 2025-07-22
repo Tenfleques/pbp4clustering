@@ -227,10 +227,6 @@ Pseudo-Boolean Polynomial Method for Interpretable Dimensionality Reduction:
 A Paradigm Shift from Abstract to Meaningful Feature Extraction.
 [Manuscript in preparation]
 
-Conference Version:
-Chikake, T., & Goldengorin, B. (2024). 
-Pseudo-Boolean Polynomial Method for Interpretable Dimensionality Reduction.
-[Conference proceedings]
 ```
 
 ## 🤝 Contributing
