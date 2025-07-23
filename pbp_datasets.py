@@ -15,11 +15,7 @@ from sklearn.metrics import silhouette_score, davies_bouldin_score
 from sklearn.decomposition import PCA
 import os
 import sys
-import json
 import logging
-import requests
-import io
-from sklearn.datasets import load_iris, load_breast_cancer, load_wine, load_digits
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 logging.getLogger('matplotlib.font_manager').disabled = True
 
@@ -73,7 +69,7 @@ class DatasetTester:
             }
         }
     
-    def apply_pbp_reduction(self, X):
+    def apply_pbp_reduction(self, X, dataset_name):
         """Apply pbp_vector reduction to dataset."""
         if not PBP_AVAILABLE:
             print("PBP module not available. Using PCA as fallback.")
@@ -83,14 +79,18 @@ class DatasetTester:
         print("Applying actual PBP vector reduction...")
         reduced_samples = []
         
-        for i in range(X.shape[0]):
-            try:
-                pbp_result = pbp_vector(X[i])
-                reduced_samples.append(pbp_result)
-            except Exception as e:
-                print(f"Error processing sample {i}: {e}")
-                # Use original sample if reduction fails
-                reduced_samples.append(X[i].flatten())
+        if os.path.exists(os.path.join(self.data_dir, f'{dataset_name}_pbp_features.npy')):
+            reduced_samples = np.load(os.path.join(self.data_dir, f'{dataset_name}_pbp_features.npy'))
+        else:
+            for i in range(X.shape[0]):
+                try:
+                    pbp_result = pbp_vector(X[i])
+                    reduced_samples.append(pbp_result)
+                    np.save(os.path.join(self.data_dir, f'{dataset_name}_pbp_features.npy'), reduced_samples)
+                except Exception as e:
+                    print(f"Error processing sample {i}: {e}")
+                    # Use original sample if reduction fails
+                    reduced_samples.append(X[i].flatten())
         
         return np.array(reduced_samples), "PBP"
     
@@ -204,7 +204,7 @@ class DatasetTester:
         
         # Apply pbp_vector reduction
         print("\nApplying pbp_vector reduction...")
-        X_reduced, method_label = self.apply_pbp_reduction(X)
+        X_reduced, method_label = self.apply_pbp_reduction(X, dataset_name)
         
         print(f"Reduced shape: {X_reduced.shape}")
         print(f"Dimensionality reduction: {X.shape[1] * X.shape[2]} -> {X_reduced.shape[1]}")

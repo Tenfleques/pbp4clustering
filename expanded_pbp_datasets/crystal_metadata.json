@@ -1,0 +1,25 @@
+{
+  "structure": "Crystal_System \u00d7 Lattice_Parameters",
+  "source": "Crystallography.net (expanded)",
+  "natural_relationships": "Crystal systems \u00d7 Lattice parameters",
+  "features": [
+    "a_parameter",
+    "b_parameter",
+    "c_parameter",
+    "alpha_angle",
+    "beta_angle",
+    "gamma_angle"
+  ],
+  "materials": [
+    "copper",
+    "gold",
+    "silver",
+    "iron",
+    "nickel",
+    "cobalt",
+    "zinc",
+    "magnesium",
+    "cadmium",
+    "beryllium"
+  ]
+}

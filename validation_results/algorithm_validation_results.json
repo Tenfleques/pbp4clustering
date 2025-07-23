@@ -1,0 +1,140 @@
+{
+  "crystal_natural_detection": {
+    "original_correlation": 0.7382535503361072,
+    "random_correlation": 0.690160657732458,
+    "original_variance": 50.59426111111111,
+    "random_variance": 2.1697990392731565,
+    "natural_relationship_score": 1.0696836194077763
+  },
+  "spectroscopy_natural_detection": {
+    "original_correlation": 0.6310428233781813,
+    "random_correlation": 0.7100402130703718,
+    "original_variance": 0.012259840671284342,
+    "random_variance": 1.0271660494861432,
+    "natural_relationship_score": 0.8887423722797498
+  },
+  "protein_natural_detection": {
+    "original_correlation": 1.0,
+    "random_correlation": 1.0,
+    "original_variance": 0.48042540964982877,
+    "random_variance": 2.364176150032018,
+    "natural_relationship_score": 1.0
+  },
+  "dna_natural_detection": {
+    "original_correlation": 0.9178612071817134,
+    "random_correlation": 0.7421728242381505,
+    "original_variance": 33301184.334279485,
+    "random_variance": 1.3762316906051888,
+    "natural_relationship_score": 1.236721659977121
+  },
+  "crystal_kmeans": {
+    "original_silhouette": 0.061762127519608294,
+    "random_silhouette": 0.1501314618684232,
+    "improvement": -0.08836933434881489
+  },
+  "crystal_hierarchical": {
+    "original_silhouette": 0.13961343379189015,
+    "random_silhouette": 0.1501314618684232,
+    "improvement": -0.010518028076533043
+  },
+  "spectroscopy_kmeans": {
+    "original_silhouette": 0.0877285015473145,
+    "random_silhouette": -0.04813992545108162,
+    "improvement": 0.13586842699839613
+  },
+  "spectroscopy_hierarchical": {
+    "original_silhouette": 0.0877285015473145,
+    "random_silhouette": 0.20949371246402895,
+    "improvement": -0.12176521091671445
+  },
+  "protein_kmeans": {
+    "original_silhouette": 0,
+    "random_silhouette": 0,
+    "improvement": 0
+  },
+  "protein_hierarchical": {
+    "original_silhouette": 0,
+    "random_silhouette": 0,
+    "improvement": 0
+  },
+  "dna_kmeans": {
+    "original_silhouette": 0.29514707596456147,
+    "random_silhouette": 0.18226568005135488,
+    "improvement": 0.11288139591320659
+  },
+  "dna_hierarchical": {
+    "original_silhouette": 0.29514707596456147,
+    "random_silhouette": 0.18226568005135488,
+    "improvement": 0.11288139591320659
+  },
+  "crystal_parameter_tuning": {
+    "best_kmeans_k": 2,
+    "best_kmeans_score": 0.061762127519608294,
+    "best_hierarchical_k": 2,
+    "best_hierarchical_score": 0.13961343379189015
+  },
+  "spectroscopy_parameter_tuning": {
+    "best_kmeans_k": 2,
+    "best_kmeans_score": 0.0877285015473145,
+    "best_hierarchical_k": 2,
+    "best_hierarchical_score": 0.0877285015473145
+  },
+  "protein_parameter_tuning": {
+    "best_kmeans_k": 2,
+    "best_kmeans_score": -1,
+    "best_hierarchical_k": 2,
+    "best_hierarchical_score": -1
+  },
+  "dna_parameter_tuning": {
+    "best_kmeans_k": 2,
+    "best_kmeans_score": 0.29514707596456147,
+    "best_hierarchical_k": 2,
+    "best_hierarchical_score": 0.29514707596456147
+  },
+  "cross_domain_comparison": {
+    "crystal": {
+      "structure": "Crystal_System \u00d7 Lattice_Parameters",
+      "natural_relationships": "Crystal systems \u00d7 Lattice parameters",
+      "feature_correlations": 0.7382535503361072,
+      "feature_variance": 50.59426111111111,
+      "feature_range": 6.056666666666666,
+      "shape": [
+        3,
+        6
+      ]
+    },
+    "spectroscopy": {
+      "structure": "Chemical_Type \u00d7 Absorption_Features",
+      "natural_relationships": "Chemical functional groups \u00d7 Absorption characteristics",
+      "feature_correlations": 0.6310428233781813,
+      "feature_variance": 0.012259840671284342,
+      "feature_range": 0.1848307494256346,
+      "shape": [
+        3,
+        4
+      ]
+    },
+    "protein": {
+      "structure": "Structural_Elements \u00d7 Spatial_Coordinates",
+      "natural_relationships": "Structural elements \u00d7 Spatial coordinates",
+      "feature_correlations": 1.0,
+      "feature_variance": 0.48042540964982877,
+      "feature_range": 0.4901149914304952,
+      "shape": [
+        2,
+        4
+      ]
+    },
+    "dna": {
+      "structure": "Nucleotide_Position \u00d7 Sequence_Features",
+      "natural_relationships": "Sequential and structural relationships",
+      "feature_correlations": 0.9178612071817134,
+      "feature_variance": 33301184.334279485,
+      "feature_range": 5180.543484965618,
+      "shape": [
+        3,
+        4
+      ]
+    }
+  }
+}

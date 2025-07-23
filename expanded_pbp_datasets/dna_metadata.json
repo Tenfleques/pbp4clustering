@@ -1,0 +1,23 @@
+{
+  "structure": "Nucleotide_Position \u00d7 Sequence_Features",
+  "source": "GenBank",
+  "natural_relationships": "Sequential and structural relationships",
+  "features": [
+    "sequence_length",
+    "gc_content",
+    "at_content",
+    "unique_4mers"
+  ],
+  "sequences": [
+    "Dengue_virus_1",
+    "Dengue_virus_2",
+    "Dengue_virus_3",
+    "Dengue_virus_4",
+    "HIV_1",
+    "HIV_2",
+    "SARS_CoV_2",
+    "SARS_CoV_1",
+    "Zika_virus",
+    "West_Nile_virus"
+  ]
+}

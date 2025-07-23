@@ -21,6 +21,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+advanced/
 
 # Virtual environments
 .venv/
@@ -272,6 +273,7 @@ data/*.npy
 data/*.npz
 data/*.csv
 data/*.json
+data/*
 
 # Generated results
 results/

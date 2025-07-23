@@ -1,0 +1,862 @@
+{
+  "clustering_analysis": {
+    "crystal": {
+      "metadata": {
+        "structure": "Crystal_System \u00d7 Lattice_Parameters",
+        "source": "Crystallography.net (expanded)",
+        "natural_relationships": "Crystal systems \u00d7 Lattice parameters",
+        "features": [
+          "a_parameter",
+          "b_parameter",
+          "c_parameter",
+          "alpha_angle",
+          "beta_angle",
+          "gamma_angle"
+        ],
+        "materials": [
+          "copper",
+          "gold",
+          "silver",
+          "iron",
+          "nickel",
+          "cobalt",
+          "zinc",
+          "magnesium",
+          "cadmium",
+          "beryllium"
+        ]
+      },
+      "algorithms": {
+        "KMeans": {
+          "silhouette_score": 0.4218443582334871,
+          "calinski_harabasz_score": 12.255646754771726,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            2,
+            4,
+            4
+          ],
+          "cluster_balance": 0.5,
+          "labels": [
+            2,
+            2,
+            2,
+            0,
+            2,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        "Hierarchical": {
+          "silhouette_score": 0.4958114450537461,
+          "calinski_harabasz_score": 14.285237196621855,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            3,
+            4,
+            3
+          ],
+          "cluster_balance": 0.75,
+          "labels": [
+            1,
+            1,
+            1,
+            0,
+            1,
+            0,
+            2,
+            2,
+            2,
+            0
+          ]
+        },
+        "DBSCAN": {
+          "silhouette_score": 0.5146855255765004,
+          "calinski_harabasz_score": 5.888740812173138,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            6,
+            2,
+            2
+          ],
+          "cluster_balance": 0.3333333333333333,
+          "labels": [
+            1,
+            2,
+            2,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "spectroscopy": {
+      "metadata": {
+        "structure": "Chemical_Type \u00d7 Absorption_Features",
+        "source": "NIST Chemistry WebBook (expanded)",
+        "natural_relationships": "Chemical functional groups \u00d7 Absorption characteristics",
+        "features": [
+          "absorption_band_1",
+          "absorption_band_2",
+          "absorption_band_3",
+          "absorption_band_4"
+        ],
+        "compounds": [
+          "methanol",
+          "propanol",
+          "toluene",
+          "xylene",
+          "formaldehyde",
+          "acetaldehyde",
+          "acetic_acid",
+          "propionic_acid",
+          "ethyl_acetate",
+          "methyl_acetate"
+        ],
+        "compound_types": [
+          "alcohol",
+          "alcohol",
+          "aromatic",
+          "aromatic",
+          "aldehyde",
+          "aldehyde",
+          "carboxylic_acid",
+          "carboxylic_acid",
+          "ester",
+          "ester"
+        ]
+      },
+      "algorithms": {
+        "KMeans": {
+          "silhouette_score": 0.619869817214312,
+          "calinski_harabasz_score": 16.04846559622578,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            6,
+            2,
+            2
+          ],
+          "cluster_balance": 0.3333333333333333,
+          "labels": [
+            0,
+            0,
+            0,
+            0,
+            2,
+            2,
+            1,
+            1,
+            0,
+            0
+          ]
+        },
+        "Hierarchical": {
+          "silhouette_score": 0.619869817214312,
+          "calinski_harabasz_score": 16.04846559622578,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            6,
+            2,
+            2
+          ],
+          "cluster_balance": 0.3333333333333333,
+          "labels": [
+            0,
+            0,
+            0,
+            0,
+            2,
+            2,
+            1,
+            1,
+            0,
+            0
+          ]
+        },
+        "DBSCAN": {
+          "silhouette_score": 0.04919324276633132,
+          "calinski_harabasz_score": 0.9306603113770242,
+          "n_clusters": 2,
+          "cluster_sizes": [
+            8,
+            2
+          ],
+          "cluster_balance": 0.25,
+          "labels": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "protein": {
+      "metadata": {
+        "structure": "Structural_Elements \u00d7 Spatial_Coordinates",
+        "source": "Protein Data Bank (PDB)",
+        "natural_relationships": "Structural elements \u00d7 Spatial coordinates",
+        "features": [
+          "alpha_helix_content",
+          "beta_sheet_content",
+          "loop_content",
+          "compactness"
+        ],
+        "proteins": [
+          "Green_Fluorescent_Protein",
+          "Triosephosphate_Isomerase",
+          "Lysozyme",
+          "Myoglobin",
+          "Ribonuclease_A",
+          "Protein_G",
+          "Adenylate_Kinase",
+          "Subtilisin",
+          "Barnase"
+        ]
+      },
+      "algorithms": {
+        "KMeans": {
+          "silhouette_score": 0.17984754922322896,
+          "calinski_harabasz_score": 4.357265706908989,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            4,
+            4,
+            1
+          ],
+          "cluster_balance": 0.25,
+          "labels": [
+            2,
+            1,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            0
+          ]
+        },
+        "Hierarchical": {
+          "silhouette_score": 0.5187373184300154,
+          "calinski_harabasz_score": 10.119679167805739,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            3,
+            4,
+            2
+          ],
+          "cluster_balance": 0.5,
+          "labels": [
+            0,
+            1,
+            1,
+            0,
+            1,
+            2,
+            1,
+            2,
+            0
+          ]
+        },
+        "DBSCAN": {
+          "silhouette_score": 0.16453683230986033,
+          "calinski_harabasz_score": 0.9711790086433214,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            5,
+            2,
+            2
+          ],
+          "cluster_balance": 0.4,
+          "labels": [
+            0,
+            1,
+            1,
+            2,
+            0,
+            0,
+            0,
+            0,
+            2
+          ]
+        }
+      }
+    },
+    "dna": {
+      "metadata": {
+        "structure": "Nucleotide_Position \u00d7 Sequence_Features",
+        "source": "GenBank",
+        "natural_relationships": "Sequential and structural relationships",
+        "features": [
+          "sequence_length",
+          "gc_content",
+          "at_content",
+          "unique_4mers"
+        ],
+        "sequences": [
+          "Dengue_virus_1",
+          "Dengue_virus_2",
+          "Dengue_virus_3",
+          "Dengue_virus_4",
+          "HIV_1",
+          "HIV_2",
+          "SARS_CoV_2",
+          "SARS_CoV_1",
+          "Zika_virus",
+          "West_Nile_virus"
+        ]
+      },
+      "algorithms": {
+        "KMeans": {
+          "silhouette_score": 1.0,
+          "calinski_harabasz_score": 1.0,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            6,
+            2,
+            2
+          ],
+          "cluster_balance": 0.3333333333333333,
+          "labels": [
+            0,
+            0,
+            0,
+            0,
+            2,
+            2,
+            1,
+            1,
+            0,
+            0
+          ]
+        },
+        "Hierarchical": {
+          "silhouette_score": 1.0,
+          "calinski_harabasz_score": 1.0,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            2,
+            6,
+            2
+          ],
+          "cluster_balance": 0.3333333333333333,
+          "labels": [
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            0,
+            0,
+            1,
+            1
+          ]
+        },
+        "DBSCAN": {
+          "silhouette_score": 1.0,
+          "calinski_harabasz_score": 1.0,
+          "n_clusters": 3,
+          "cluster_sizes": [
+            6,
+            2,
+            2
+          ],
+          "cluster_balance": 0.3333333333333333,
+          "labels": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            2,
+            2,
+            0,
+            0
+          ]
+        }
+      }
+    }
+  },
+  "feature_importance": {
+    "crystal": {
+      "methods": {
+        "correlation": {
+          "a_parameter": NaN,
+          "b_parameter": NaN,
+          "c_parameter": NaN,
+          "alpha_angle": NaN,
+          "beta_angle": NaN,
+          "gamma_angle": NaN
+        },
+        "variance": {
+          "a_parameter": 0.3985511111111111,
+          "b_parameter": 0.3985511111111111,
+          "c_parameter": 0.7322444444444446,
+          "alpha_angle": 0.0,
+          "beta_angle": 0.0,
+          "gamma_angle": 250.0
+        },
+        "mutual_information": {
+          "b_parameter": 0.9956349206349207,
+          "c_parameter": 0.009404761904762138,
+          "alpha_angle": 0.0,
+          "beta_angle": 0.0,
+          "gamma_angle": 0.3330158730158732,
+          "a_parameter": 0
+        },
+        "random_forest": {
+          "b_parameter": 0.7941813915096476,
+          "c_parameter": 0.07404081524511448,
+          "alpha_angle": 0.0,
+          "beta_angle": 0.0,
+          "gamma_angle": 0.1317777932452379,
+          "a_parameter": 0
+        }
+      },
+      "aggregated_importance": {
+        "b_parameter": NaN,
+        "alpha_angle": NaN,
+        "gamma_angle": NaN,
+        "a_parameter": NaN,
+        "beta_angle": NaN,
+        "c_parameter": NaN
+      },
+      "sorted_features": [
+        [
+          "b_parameter",
+          NaN
+        ],
+        [
+          "alpha_angle",
+          NaN
+        ],
+        [
+          "gamma_angle",
+          NaN
+        ],
+        [
+          "a_parameter",
+          NaN
+        ],
+        [
+          "beta_angle",
+          NaN
+        ],
+        [
+          "c_parameter",
+          NaN
+        ]
+      ]
+    },
+    "spectroscopy": {
+      "methods": {
+        "correlation": {
+          "absorption_band_1": 0.3496545107345756,
+          "absorption_band_2": 0.4640049566183946,
+          "absorption_band_3": 0.5037082553887736,
+          "absorption_band_4": 0.4080095039740037
+        },
+        "variance": {
+          "absorption_band_1": 0.007601278681936714,
+          "absorption_band_2": 0.020893572808724174,
+          "absorption_band_3": 0.007871018581351339,
+          "absorption_band_4": 0.06807539764997705
+        },
+        "mutual_information": {
+          "absorption_band_2": 0.0,
+          "absorption_band_3": 0.06944444444444464,
+          "absorption_band_4": 0.13468253968253996,
+          "absorption_band_1": 0
+        },
+        "random_forest": {
+          "absorption_band_2": 0.547486602386879,
+          "absorption_band_3": 0.18557574815051353,
+          "absorption_band_4": 0.2669376494626075,
+          "absorption_band_1": 0
+        }
+      },
+      "aggregated_importance": {
+        "absorption_band_1": 0.08931394735412808,
+        "absorption_band_4": 0.21942627269228204,
+        "absorption_band_3": 0.19164986664127076,
+        "absorption_band_2": 0.2580962829534994
+      },
+      "sorted_features": [
+        [
+          "absorption_band_2",
+          0.2580962829534994
+        ],
+        [
+          "absorption_band_4",
+          0.21942627269228204
+        ],
+        [
+          "absorption_band_3",
+          0.19164986664127076
+        ],
+        [
+          "absorption_band_1",
+          0.08931394735412808
+        ]
+      ]
+    },
+    "protein": {
+      "methods": {
+        "correlation": {
+          "alpha_helix_content": NaN,
+          "beta_sheet_content": NaN,
+          "loop_content": NaN,
+          "compactness": NaN
+        },
+        "variance": {
+          "alpha_helix_content": 0.0012500000000000005,
+          "beta_sheet_content": 0.0012500000000000013,
+          "loop_content": 0.0,
+          "compactness": 0.6963584692735713
+        },
+        "mutual_information": {
+          "beta_sheet_content": 0.8567460317460318,
+          "loop_content": 1.1102230246251565e-16,
+          "compactness": 0.0,
+          "alpha_helix_content": 0
+        },
+        "random_forest": {
+          "beta_sheet_content": 0.8956183842930997,
+          "loop_content": 0.0,
+          "compactness": 0.10438161570690027,
+          "alpha_helix_content": 0
+        }
+      },
+      "aggregated_importance": {
+        "loop_content": NaN,
+        "beta_sheet_content": NaN,
+        "alpha_helix_content": NaN,
+        "compactness": NaN
+      },
+      "sorted_features": [
+        [
+          "loop_content",
+          NaN
+        ],
+        [
+          "beta_sheet_content",
+          NaN
+        ],
+        [
+          "alpha_helix_content",
+          NaN
+        ],
+        [
+          "compactness",
+          NaN
+        ]
+      ]
+    },
+    "dna": {
+      "methods": {
+        "correlation": {
+          "sequence_length": NaN,
+          "gc_content": NaN,
+          "at_content": NaN,
+          "unique_4mers": NaN
+        },
+        "variance": {
+          "sequence_length": 68394786.84444445,
+          "gc_content": 0.001360984371364144,
+          "at_content": 0.0013609843713641443,
+          "unique_4mers": 0.0
+        },
+        "mutual_information": {
+          "gc_content": 0.1884920634920637,
+          "at_content": 0.1884920634920637,
+          "unique_4mers": 0.0,
+          "sequence_length": 0
+        },
+        "random_forest": {
+          "gc_content": 0.4850782335910942,
+          "at_content": 0.5149217664089059,
+          "unique_4mers": 0.0,
+          "sequence_length": 0
+        }
+      },
+      "aggregated_importance": {
+        "sequence_length": NaN,
+        "gc_content": NaN,
+        "unique_4mers": NaN,
+        "at_content": NaN
+      },
+      "sorted_features": [
+        [
+          "sequence_length",
+          NaN
+        ],
+        [
+          "gc_content",
+          NaN
+        ],
+        [
+          "unique_4mers",
+          NaN
+        ],
+        [
+          "at_content",
+          NaN
+        ]
+      ]
+    }
+  },
+  "cross_domain_comparison": {
+    "crystal": {
+      "structure": "Crystal_System \u00d7 Lattice_Parameters",
+      "natural_relationships": "Crystal systems \u00d7 Lattice parameters",
+      "feature_correlations": 0.6593072820520535,
+      "feature_variance": 41.92155777777778,
+      "feature_range": 6.058333333333334,
+      "interaction_strength": NaN,
+      "shape": [
+        10,
+        6
+      ],
+      "domain": "Materials"
+    },
+    "spectroscopy": {
+      "structure": "Chemical_Type \u00d7 Absorption_Features",
+      "natural_relationships": "Chemical functional groups \u00d7 Absorption characteristics",
+      "feature_correlations": 0.5735082300092026,
+      "feature_variance": 0.02611031693049732,
+      "feature_range": 0.4161342156871704,
+      "interaction_strength": 0.4313443066789368,
+      "shape": [
+        10,
+        4
+      ],
+      "domain": "Chemistry"
+    },
+    "protein": {
+      "structure": "Structural_Elements \u00d7 Spatial_Coordinates",
+      "natural_relationships": "Structural elements \u00d7 Spatial coordinates",
+      "feature_correlations": 0.6714218394709021,
+      "feature_variance": 0.1747146173183928,
+      "feature_range": 0.6492076136389848,
+      "interaction_strength": NaN,
+      "shape": [
+        9,
+        4
+      ],
+      "domain": "Biology"
+    },
+    "dna": {
+      "structure": "Nucleotide_Position \u00d7 Sequence_Features",
+      "natural_relationships": "Sequential and structural relationships",
+      "feature_correlations": 0.9212464155160537,
+      "feature_variance": 17098696.711791605,
+      "feature_range": 5180.543484965618,
+      "interaction_strength": NaN,
+      "shape": [
+        10,
+        4
+      ],
+      "domain": "Genomics"
+    }
+  },
+  "performance_benchmarking": {
+    "crystal": {
+      "traditional_methods": {
+        "KMeans": {
+          "silhouette_score": 0.4218443582334871,
+          "n_clusters": 3
+        },
+        "Hierarchical": {
+          "silhouette_score": 0.4958114450537461,
+          "n_clusters": 3
+        },
+        "DBSCAN": {
+          "silhouette_score": 0.5146855255765004,
+          "n_clusters": 3
+        }
+      },
+      "pbp_silhouette": 0.4218443582334877,
+      "pbp_improvement": -0.09284116734301268,
+      "natural_relationship_strength": 0.6593072820520535,
+      "metadata": {
+        "structure": "Crystal_System \u00d7 Lattice_Parameters",
+        "source": "Crystallography.net (expanded)",
+        "natural_relationships": "Crystal systems \u00d7 Lattice parameters",
+        "features": [
+          "a_parameter",
+          "b_parameter",
+          "c_parameter",
+          "alpha_angle",
+          "beta_angle",
+          "gamma_angle"
+        ],
+        "materials": [
+          "copper",
+          "gold",
+          "silver",
+          "iron",
+          "nickel",
+          "cobalt",
+          "zinc",
+          "magnesium",
+          "cadmium",
+          "beryllium"
+        ]
+      }
+    },
+    "spectroscopy": {
+      "traditional_methods": {
+        "KMeans": {
+          "silhouette_score": 0.619869817214312,
+          "n_clusters": 3
+        },
+        "Hierarchical": {
+          "silhouette_score": 0.619869817214312,
+          "n_clusters": 3
+        },
+        "DBSCAN": {
+          "silhouette_score": 0.04919324276633132,
+          "n_clusters": 2
+        }
+      },
+      "pbp_silhouette": 0.6198698172143122,
+      "pbp_improvement": 2.220446049250313e-16,
+      "natural_relationship_strength": 0.5735082300092026,
+      "metadata": {
+        "structure": "Chemical_Type \u00d7 Absorption_Features",
+        "source": "NIST Chemistry WebBook (expanded)",
+        "natural_relationships": "Chemical functional groups \u00d7 Absorption characteristics",
+        "features": [
+          "absorption_band_1",
+          "absorption_band_2",
+          "absorption_band_3",
+          "absorption_band_4"
+        ],
+        "compounds": [
+          "methanol",
+          "propanol",
+          "toluene",
+          "xylene",
+          "formaldehyde",
+          "acetaldehyde",
+          "acetic_acid",
+          "propionic_acid",
+          "ethyl_acetate",
+          "methyl_acetate"
+        ],
+        "compound_types": [
+          "alcohol",
+          "alcohol",
+          "aromatic",
+          "aromatic",
+          "aldehyde",
+          "aldehyde",
+          "carboxylic_acid",
+          "carboxylic_acid",
+          "ester",
+          "ester"
+        ]
+      }
+    },
+    "protein": {
+      "traditional_methods": {
+        "KMeans": {
+          "silhouette_score": 0.17984754922322896,
+          "n_clusters": 3
+        },
+        "Hierarchical": {
+          "silhouette_score": 0.5187373184300154,
+          "n_clusters": 3
+        },
+        "DBSCAN": {
+          "silhouette_score": 0.16453683230986033,
+          "n_clusters": 3
+        }
+      },
+      "pbp_silhouette": 0.17984754922322943,
+      "pbp_improvement": -0.33888976920678593,
+      "natural_relationship_strength": 0.6714218394709021,
+      "metadata": {
+        "structure": "Structural_Elements \u00d7 Spatial_Coordinates",
+        "source": "Protein Data Bank (PDB)",
+        "natural_relationships": "Structural elements \u00d7 Spatial coordinates",
+        "features": [
+          "alpha_helix_content",
+          "beta_sheet_content",
+          "loop_content",
+          "compactness"
+        ],
+        "proteins": [
+          "Green_Fluorescent_Protein",
+          "Triosephosphate_Isomerase",
+          "Lysozyme",
+          "Myoglobin",
+          "Ribonuclease_A",
+          "Protein_G",
+          "Adenylate_Kinase",
+          "Subtilisin",
+          "Barnase"
+        ]
+      }
+    },
+    "dna": {
+      "traditional_methods": {
+        "KMeans": {
+          "silhouette_score": 1.0,
+          "n_clusters": 3
+        },
+        "Hierarchical": {
+          "silhouette_score": 1.0,
+          "n_clusters": 3
+        },
+        "DBSCAN": {
+          "silhouette_score": 1.0,
+          "n_clusters": 3
+        }
+      },
+      "pbp_silhouette": 1.0,
+      "pbp_improvement": 0.0,
+      "natural_relationship_strength": 0.9212464155160537,
+      "metadata": {
+        "structure": "Nucleotide_Position \u00d7 Sequence_Features",
+        "source": "GenBank",
+        "natural_relationships": "Sequential and structural relationships",
+        "features": [
+          "sequence_length",
+          "gc_content",
+          "at_content",
+          "unique_4mers"
+        ],
+        "sequences": [
+          "Dengue_virus_1",
+          "Dengue_virus_2",
+          "Dengue_virus_3",
+          "Dengue_virus_4",
+          "HIV_1",
+          "HIV_2",
+          "SARS_CoV_2",
+          "SARS_CoV_1",
+          "Zika_virus",
+          "West_Nile_virus"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,412 @@
+{
+  "copper": {
+    "formula": "Cu",
+    "lattice_parameters": [
+      3.61,
+      3.61,
+      3.61,
+      90.0,
+      90.0,
+      90.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.5,
+        0.5,
+        0
+      ],
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0,
+        0.5,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 3.61,
+      "b_parameter": 3.61,
+      "c_parameter": 3.61,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 90.0,
+      "unit_cell_volume": 47.045880999999994,
+      "crystal_system": "cubic",
+      "space_group": "Fm-3m"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "gold": {
+    "formula": "Au",
+    "lattice_parameters": [
+      4.08,
+      4.08,
+      4.08,
+      90.0,
+      90.0,
+      90.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.5,
+        0.5,
+        0
+      ],
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0,
+        0.5,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 4.08,
+      "b_parameter": 4.08,
+      "c_parameter": 4.08,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 90.0,
+      "unit_cell_volume": 67.91731200000001,
+      "crystal_system": "cubic",
+      "space_group": "Fm-3m"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "silver": {
+    "formula": "Ag",
+    "lattice_parameters": [
+      4.09,
+      4.09,
+      4.09,
+      90.0,
+      90.0,
+      90.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.5,
+        0.5,
+        0
+      ],
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0,
+        0.5,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 4.09,
+      "b_parameter": 4.09,
+      "c_parameter": 4.09,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 90.0,
+      "unit_cell_volume": 68.41792899999999,
+      "crystal_system": "cubic",
+      "space_group": "Fm-3m"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "iron": {
+    "formula": "Fe",
+    "lattice_parameters": [
+      2.87,
+      2.87,
+      2.87,
+      90.0,
+      90.0,
+      90.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.5,
+        0.5,
+        0
+      ],
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0,
+        0.5,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 2.87,
+      "b_parameter": 2.87,
+      "c_parameter": 2.87,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 90.0,
+      "unit_cell_volume": 23.639903000000004,
+      "crystal_system": "cubic",
+      "space_group": "Im-3m"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "nickel": {
+    "formula": "Ni",
+    "lattice_parameters": [
+      3.52,
+      3.52,
+      3.52,
+      90.0,
+      90.0,
+      90.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.5,
+        0.5,
+        0
+      ],
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0,
+        0.5,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 3.52,
+      "b_parameter": 3.52,
+      "c_parameter": 3.52,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 90.0,
+      "unit_cell_volume": 43.614208,
+      "crystal_system": "cubic",
+      "space_group": "Fm-3m"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "cobalt": {
+    "formula": "Co",
+    "lattice_parameters": [
+      2.51,
+      2.51,
+      4.07,
+      90.0,
+      90.0,
+      120.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.3333333333333333,
+        0.6666666666666666,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 2.51,
+      "b_parameter": 2.51,
+      "c_parameter": 4.07,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 120.0,
+      "unit_cell_volume": 22.206109850776127,
+      "crystal_system": "hexagonal",
+      "space_group": "P6/mmm"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "zinc": {
+    "formula": "Zn",
+    "lattice_parameters": [
+      2.66,
+      2.66,
+      4.95,
+      90.0,
+      90.0,
+      120.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.3333333333333333,
+        0.6666666666666666,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 2.66,
+      "b_parameter": 2.66,
+      "c_parameter": 4.95,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 120.0,
+      "unit_cell_volume": 30.331864267735014,
+      "crystal_system": "hexagonal",
+      "space_group": "P6/mmm"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "magnesium": {
+    "formula": "Mg",
+    "lattice_parameters": [
+      3.21,
+      3.21,
+      5.21,
+      90.0,
+      90.0,
+      120.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.3333333333333333,
+        0.6666666666666666,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 3.21,
+      "b_parameter": 3.21,
+      "c_parameter": 5.21,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 120.0,
+      "unit_cell_volume": 46.49202041193457,
+      "crystal_system": "hexagonal",
+      "space_group": "P6/mmm"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "cadmium": {
+    "formula": "Cd",
+    "lattice_parameters": [
+      2.98,
+      2.98,
+      5.62,
+      90.0,
+      90.0,
+      120.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.3333333333333333,
+        0.6666666666666666,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 2.98,
+      "b_parameter": 2.98,
+      "c_parameter": 5.62,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 120.0,
+      "unit_cell_volume": 43.22146421621239,
+      "crystal_system": "hexagonal",
+      "space_group": "P6/mmm"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "beryllium": {
+    "formula": "Be",
+    "lattice_parameters": [
+      2.29,
+      2.29,
+      3.58,
+      90.0,
+      90.0,
+      120.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.3333333333333333,
+        0.6666666666666666,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 2.29,
+      "b_parameter": 2.29,
+      "c_parameter": 3.58,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 120.0,
+      "unit_cell_volume": 16.258655275549792,
+      "crystal_system": "hexagonal",
+      "space_group": "P6/mmm"
+    },
+    "source": "Crystallography.net (expanded)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  }
+}

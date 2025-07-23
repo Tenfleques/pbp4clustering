@@ -1,0 +1,22 @@
+{
+  "structure": "Structural_Elements \u00d7 Spatial_Coordinates",
+  "source": "Protein Data Bank (PDB)",
+  "natural_relationships": "Structural elements \u00d7 Spatial coordinates",
+  "features": [
+    "alpha_helix_content",
+    "beta_sheet_content",
+    "loop_content",
+    "compactness"
+  ],
+  "proteins": [
+    "Green_Fluorescent_Protein",
+    "Triosephosphate_Isomerase",
+    "Lysozyme",
+    "Myoglobin",
+    "Ribonuclease_A",
+    "Protein_G",
+    "Adenylate_Kinase",
+    "Subtilisin",
+    "Barnase"
+  ]
+}

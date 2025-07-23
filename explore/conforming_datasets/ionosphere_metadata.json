@@ -1,0 +1,1 @@
+[{"dataset_name":"Ionosphere","matrix_shape":"17 \u00d7 2","n_samples":351,"n_classes":2,"feature_structure":"17 pulse returns \u00d7 2 phases (in-phase, quadrature)","transformation_rationale":"34 radar returns naturally pair into 17 pulse returns with in-phase and quadrature components","semantic_grouping":"Radar signals with in-phase and quadrature components"}]

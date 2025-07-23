@@ -1,0 +1,130 @@
+{
+  "silicon": {
+    "formula": "Si",
+    "lattice_parameters": [
+      5.43,
+      5.43,
+      5.43,
+      90.0,
+      90.0,
+      90.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.5,
+        0.5,
+        0
+      ],
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0,
+        0.5,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 5.43,
+      "b_parameter": 5.43,
+      "c_parameter": 5.43,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 90.0,
+      "unit_cell_volume": 160.10300699999996,
+      "crystal_system": "cubic",
+      "space_group": "Fd-3m"
+    },
+    "source": "Crystallography.net (based on known crystal structures)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "aluminum": {
+    "formula": "Al",
+    "lattice_parameters": [
+      4.05,
+      4.05,
+      4.05,
+      90.0,
+      90.0,
+      90.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.5,
+        0.5,
+        0
+      ],
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0,
+        0.5,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 4.05,
+      "b_parameter": 4.05,
+      "c_parameter": 4.05,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 90.0,
+      "unit_cell_volume": 66.43012499999999,
+      "crystal_system": "cubic",
+      "space_group": "Fm-3m"
+    },
+    "source": "Crystallography.net (based on known crystal structures)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  },
+  "titanium": {
+    "formula": "Ti",
+    "lattice_parameters": [
+      2.95,
+      2.95,
+      4.68,
+      90.0,
+      90.0,
+      120.0
+    ],
+    "atomic_positions": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0.3333333333333333,
+        0.6666666666666666,
+        0.5
+      ]
+    ],
+    "features": {
+      "a_parameter": 2.95,
+      "b_parameter": 2.95,
+      "c_parameter": 4.68,
+      "alpha_angle": 90.0,
+      "beta_angle": 90.0,
+      "gamma_angle": 120.0,
+      "unit_cell_volume": 35.27122283771148,
+      "crystal_system": "hexagonal",
+      "space_group": "P6/mmm"
+    },
+    "source": "Crystallography.net (based on known crystal structures)",
+    "structure": "Crystal_System \u00d7 Lattice_Parameters"
+  }
+}
