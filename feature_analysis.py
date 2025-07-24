@@ -33,12 +33,12 @@ def load_dataset_data(dataset_name: str, data_dir: str = "data") -> Tuple[np.nda
         Tuple of (features, targets)
     """
     # Valid datasets for PBP analysis
-    valid_datasets = ['iris', 'breast_cancer']
+    # valid_datasets = ['iris', 'breast_cancer', 'seeds', 'thyroid', 'pima', 'ionosphere']
     
-    if dataset_name not in valid_datasets:
-        raise ValueError(f"Dataset '{dataset_name}' is not valid for PBP analysis. "
-                       f"Valid datasets are: {valid_datasets}. "
-                       f"Other datasets don't have natural combinatorial relationships.")
+    # if dataset_name not in valid_datasets:
+    #     raise ValueError(f"Dataset '{dataset_name}' is not valid for PBP analysis. "
+    #                    f"Valid datasets are: {valid_datasets}. "
+    #                    f"Other datasets don't have natural combinatorial relationships.")
     
     features_path = os.path.join(data_dir, f"{dataset_name}_pbp_features.npy")
     targets_path = os.path.join(data_dir, f"{dataset_name}_y.npy")
@@ -50,6 +50,12 @@ def load_dataset_data(dataset_name: str, data_dir: str = "data") -> Tuple[np.nda
     
     features = np.load(features_path)
     targets = np.load(targets_path)
+
+    print(features[:5])
+    zero_columns = np.all(features == 0, axis=0)
+    print(f"Has zero columns: {zero_columns}")
+
+    features = features[:, ~zero_columns]
     
     # Ensure targets is 1D
     if targets.ndim > 1:
@@ -503,6 +509,7 @@ def visualize_features(extracted_features: np.ndarray, targets: np.ndarray,
         print(f"Plot saved to: {output_file}")
     
     plt.show()
+    plt.close()
 
 def save_results(results: Dict[str, Any], output_file: str = None):
     """
@@ -543,10 +550,42 @@ def save_results(results: Dict[str, Any], output_file: str = None):
     
     print(f"\nResults saved to: {output_file}")
 
+
+def analyze_dataset(dataset_name: str, args: argparse.Namespace):
+    """
+    Analyze a dataset and return the results.
+    """
+    # Perform analysis
+    results = analyze_features(dataset_name, args.top_k, args.data_dir)
+    
+    # Print results
+    print_analysis_results(results, args.top_k)
+    
+    # Save results if requested
+    if args.save or args.output:
+        save_results(results, args.output)
+    
+    # Extract and visualize top features if requested
+    if args.visualize:
+        print(f"\nExtracting top {args.k} features for visualization...")
+        
+        # Load original data for extraction
+        features, targets = load_dataset_data(dataset_name, args.data_dir)
+        
+        # Extract top features
+        extracted_features, selected_indices = extract_top_features(features, results, args.k)
+        
+        print(f"Selected features: {selected_indices}")
+        print(f"Extracted features shape: {extracted_features.shape}")
+        
+        # Visualize
+        visualize_features(extracted_features, targets, selected_indices, 
+                        dataset_name, args.save_plot, args.plot_output)
+
 def main():
     """Main function to run feature analysis."""
     parser = argparse.ArgumentParser(description="Analyze PBP features for clustering significance")
-    parser.add_argument("dataset_name", help="Name of the dataset to analyze")
+    parser.add_argument("-d", "--dataset_name", default='all', help="Name of the dataset to analyze")
     parser.add_argument("--top-k", type=int, default=10, help="Number of top features to return (default: 10)")
     parser.add_argument("--k", type=int, default=3, help="Maximum number of features to extract for visualization (default: 3)")
     parser.add_argument("--data-dir", default="data", help="Directory containing data files (default: data)")
@@ -559,32 +598,15 @@ def main():
     args = parser.parse_args()
     
     try:
-        # Perform analysis
-        results = analyze_features(args.dataset_name, args.top_k, args.data_dir)
-        
-        # Print results
-        print_analysis_results(results, args.top_k)
-        
-        # Save results if requested
-        if args.save or args.output:
-            save_results(results, args.output)
-        
-        # Extract and visualize top features if requested
-        if args.visualize:
-            print(f"\nExtracting top {args.k} features for visualization...")
-            
-            # Load original data for extraction
-            features, targets = load_dataset_data(args.dataset_name, args.data_dir)
-            
-            # Extract top features
-            extracted_features, selected_indices = extract_top_features(features, results, args.k)
-            
-            print(f"Selected features: {selected_indices}")
-            print(f"Extracted features shape: {extracted_features.shape}")
-            
-            # Visualize
-            visualize_features(extracted_features, targets, selected_indices, 
-                            args.dataset_name, args.save_plot, args.plot_output)
+        if args.dataset_name == 'all':
+            datasets = ['iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
+                        'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
+                        'seeds', 'thyroid', 'pima', 'ionosphere', 'glass_conforming']
+            for dataset in datasets:
+                print(f"Analyzing dataset: {dataset}")
+                analyze_dataset(dataset, args)
+        else:
+            analyze_dataset(args.dataset_name, args)
             
     except Exception as e:
         print(f"Error: {e}")

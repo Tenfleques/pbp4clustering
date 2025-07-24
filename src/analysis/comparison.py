@@ -323,7 +323,9 @@ class ComprehensiveComparison:
         # List of datasets to test
         datasets = [
             'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
-            'sonar', 'glass', 'vehicle', 'ecoli', 'yeast'
+            'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
+            # Conforming datasets
+            'seeds', 'thyroid', 'pima', 'ionosphere', 'glass_conforming'
         ]
         
         all_results = {}

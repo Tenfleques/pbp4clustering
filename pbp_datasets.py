@@ -14,10 +14,12 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, davies_bouldin_score
 from sklearn.decomposition import PCA
 import os
+import argparse
 import sys
 import logging
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+import tqdm
 logging.getLogger('matplotlib.font_manager').disabled = True
+
 
 # Import PBP modules
 import sys
@@ -82,7 +84,7 @@ class DatasetTester:
         if os.path.exists(os.path.join(self.data_dir, f'{dataset_name}_pbp_features.npy')):
             reduced_samples = np.load(os.path.join(self.data_dir, f'{dataset_name}_pbp_features.npy'))
         else:
-            for i in range(X.shape[0]):
+            for i in tqdm.tqdm(range(X.shape[0])):
                 try:
                     pbp_result = pbp_vector(X[i])
                     reduced_samples.append(pbp_result)
@@ -233,7 +235,7 @@ class DatasetTester:
     
     def test_all_datasets(self, include_transformed_digits=True):
         """Test all available datasets."""
-        # List of all 10 datasets
+        # List of all datasets including conforming datasets
         datasets = [
             'iris',
             'breast_cancer', 
@@ -244,7 +246,18 @@ class DatasetTester:
             'sonar',
             'vehicle',
             'ecoli',
-            'yeast'
+            'yeast',
+            'seeds',
+            'thyroid',
+            'pima',
+            'ionosphere',
+            'spectf',
+            'glass_conforming',
+            'covertype',
+            '# # olivetti_faces',
+            'kddcup99',
+            'linnerrud',
+            'species_distribution'
         ]
         
         # Add transformed digits datasets if requested
@@ -258,7 +271,7 @@ class DatasetTester:
         
         results = {}
         
-        for dataset_name in datasets:
+        for dataset_name in tqdm.tqdm(datasets):
             try:
                 result = self.test_dataset(dataset_name)
                 if result:
@@ -330,8 +343,16 @@ def main():
     # Initialize tester
     tester = DatasetTester(data_dir, results_dir)
     
+    parser = argparse.ArgumentParser(description="Test datasets with PBP vector approach")
+    parser.add_argument("-d", "--dataset_name", default='all', help="Name of the dataset to test")
+    args = parser.parse_args()
+
     # Test all datasets
-    results = tester.test_all_datasets()
+    if args.dataset_name == 'all':
+        results = tester.test_all_datasets()
+    else:
+        results = tester.test_dataset(args.dataset_name)
+        exit()
     
     print(f"\nTesting completed! Results for {len(results)} datasets.")
     print(f"Check {results_dir} for saved visualizations and summary.")

@@ -1,0 +1,6 @@
+Dataset,Original Shape,Suitability Score,Matrix Options,Best Matrix Shape,Domain,Sample Size
+linnerrud,20x3,6,2,"(1, 3)",Health/Fitness,20
+olivetti_faces,400x4096,8,6,"(64, 64)",Computer Vision,400
+covertype,1000x54,9,8,"(6, 9)",Environmental,1000
+kddcup99,1000x41,7,8,"(5, 8)",Network Security,1000
+species_distribution,1000x6,5,4,"(2, 3)",Environmental,1000
