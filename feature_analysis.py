@@ -48,8 +48,18 @@ def load_dataset_data(dataset_name: str, data_dir: str = "data") -> Tuple[np.nda
     if not os.path.exists(targets_path):
         raise FileNotFoundError(f"Targets file not found: {targets_path}")
     
-    features = np.load(features_path)
-    targets = np.load(targets_path)
+    # Load features and targets, handling object arrays
+    try:
+        features = np.load(features_path)
+    except ValueError:
+        # Try with allow_pickle=True if default fails
+        features = np.load(features_path, allow_pickle=True)
+    
+    try:
+        targets = np.load(targets_path)
+    except ValueError:
+        # Try with allow_pickle=True if default fails
+        targets = np.load(targets_path, allow_pickle=True)
 
     print(features[:5])
     zero_columns = np.all(features == 0, axis=0)
@@ -61,6 +71,12 @@ def load_dataset_data(dataset_name: str, data_dir: str = "data") -> Tuple[np.nda
     if targets.ndim > 1:
         targets = targets.flatten()
     
+    # Convert string targets to numeric if needed
+    if targets.dtype == object or targets.dtype.kind in ['U', 'S']:
+        from sklearn.preprocessing import LabelEncoder
+        le = LabelEncoder()
+        targets = le.fit_transform(targets)
+    
     # Validate dimensions
     if features.shape[0] != targets.shape[0]:
         # If there's a mismatch, try to fix it
@@ -71,7 +87,9 @@ def load_dataset_data(dataset_name: str, data_dir: str = "data") -> Tuple[np.nda
             # Take every other target
             targets = targets[::2]
         else:
-            raise ValueError(f"Dimension mismatch: features has {features.shape[0]} samples, targets has {targets.shape[0]} samples")
+            # For large mismatches, skip this dataset
+            print(f"Warning: Dimension mismatch for {dataset_name}: features has {features.shape[0]} samples, targets has {targets.shape[0]} samples. Skipping.")
+            return None
     
     return features, targets
 
@@ -301,6 +319,141 @@ def extract_top_features(features: np.ndarray, results: Dict[str, Any], k: int =
     
     return extracted_features, selected_indices
 
+def get_feature_combinations(features: np.ndarray, n_features: int, max_combinations: int = 50) -> List[Tuple[np.ndarray, List[int]]]:
+    """
+    Generate combinations of 2 and 3 features for visualization.
+    
+    Args:
+        features: Original feature matrix
+        n_features: Number of features to choose from
+        max_combinations: Maximum number of combinations to generate
+        
+    Returns:
+        List of tuples (extracted_features, selected_indices)
+    """
+    from itertools import combinations
+    
+    combinations_list = []
+    
+    # Generate 2-feature combinations
+    for combo in combinations(range(n_features), 2):
+        selected_indices = list(combo)
+        extracted_features = features[:, selected_indices]
+        combinations_list.append((extracted_features, selected_indices))
+    
+    # Generate 3-feature combinations
+    for combo in combinations(range(n_features), 3):
+        selected_indices = list(combo)
+        extracted_features = features[:, selected_indices]
+        combinations_list.append((extracted_features, selected_indices))
+    
+    # Limit the number of combinations if too many
+    if len(combinations_list) > max_combinations:
+        # Take a subset to avoid too many plots
+        import random
+        random.seed(42)  # For reproducibility
+        combinations_list = random.sample(combinations_list, max_combinations)
+    
+    return combinations_list
+
+def evaluate_feature_combination(extracted_features: np.ndarray, targets: np.ndarray, n_clusters: int = None) -> Dict[str, float]:
+    """
+    Evaluate a feature combination using multiple clustering quality metrics.
+    
+    Args:
+        extracted_features: Feature matrix with selected features
+        targets: Target values
+        n_clusters: Number of clusters (defaults to number of unique targets)
+        
+    Returns:
+        Dictionary with evaluation scores
+    """
+    if n_clusters is None:
+        n_clusters = len(np.unique(targets))
+    
+    try:
+        # Standardize features
+        scaler = StandardScaler()
+        features_scaled = scaler.fit_transform(extracted_features)
+        
+        # Perform clustering
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        cluster_labels = kmeans.fit_predict(features_scaled)
+        
+        # Calculate metrics
+        unique_clusters = len(np.unique(cluster_labels))
+        if unique_clusters < 2:
+            return {
+                'silhouette_score': 0.0,
+                'calinski_harabasz_score': 0.0,
+                'davies_bouldin_score': float('inf'),
+                'inertia': float('inf'),
+                'combined_score': 0.0
+            }
+        
+        from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+        
+        silhouette = silhouette_score(features_scaled, cluster_labels)
+        calinski_harabasz = calinski_harabasz_score(features_scaled, cluster_labels)
+        davies_bouldin = davies_bouldin_score(features_scaled, cluster_labels)
+        inertia = kmeans.inertia_
+        
+        # Normalize scores (higher is better for all except davies_bouldin and inertia)
+        # For davies_bouldin and inertia, we'll use 1/(1+score) to convert to [0,1] range
+        davies_bouldin_norm = 1 / (1 + davies_bouldin)
+        inertia_norm = 1 / (1 + inertia / 1000)  # Normalize by dividing by 1000
+        
+        # Combined score (average of normalized scores)
+        combined_score = (silhouette + calinski_harabasz / 1000 + davies_bouldin_norm + inertia_norm) / 4
+        
+        return {
+            'silhouette_score': silhouette,
+            'calinski_harabasz_score': calinski_harabasz,
+            'davies_bouldin_score': davies_bouldin,
+            'inertia': inertia,
+            'combined_score': combined_score
+        }
+        
+    except Exception as e:
+        # Return default scores if evaluation fails
+        return {
+            'silhouette_score': 0.0,
+            'calinski_harabasz_score': 0.0,
+            'davies_bouldin_score': float('inf'),
+            'inertia': float('inf'),
+            'combined_score': 0.0
+        }
+
+def select_best_combinations(combinations_list: List[Tuple[np.ndarray, List[int]]], 
+                           targets: np.ndarray, top_k: int = 5) -> List[Tuple[np.ndarray, List[int], Dict[str, float]]]:
+    """
+    Evaluate and select the best feature combinations based on clustering quality.
+    
+    Args:
+        combinations_list: List of (extracted_features, selected_indices) tuples
+        targets: Target values
+        top_k: Number of best combinations to return
+        
+    Returns:
+        List of (extracted_features, selected_indices, evaluation_scores) tuples
+    """
+    print(f"Evaluating {len(combinations_list)} feature combinations...")
+    
+    evaluated_combinations = []
+    
+    for i, (extracted_features, selected_indices) in enumerate(combinations_list):
+        if i % 10 == 0:  # Progress indicator
+            print(f"Evaluating combination {i+1}/{len(combinations_list)}...")
+        
+        evaluation_scores = evaluate_feature_combination(extracted_features, targets)
+        evaluated_combinations.append((extracted_features, selected_indices, evaluation_scores))
+    
+    # Sort by combined score (descending)
+    evaluated_combinations.sort(key=lambda x: x[2]['combined_score'], reverse=True)
+    
+    # Return top-k combinations
+    return evaluated_combinations[:top_k]
+
 def analyze_features(dataset_name: str, top_k: int = 10, data_dir: str = "data") -> Dict[str, Any]:
     """
     Perform comprehensive feature analysis for a dataset.
@@ -314,7 +467,13 @@ def analyze_features(dataset_name: str, top_k: int = 10, data_dir: str = "data")
         Dictionary containing all analysis results
     """
     print(f"Loading data for dataset: {dataset_name}")
-    features, targets = load_dataset_data(dataset_name, data_dir)
+    data_result = load_dataset_data(dataset_name, data_dir)
+    
+    if data_result is None:
+        print(f"Skipping {dataset_name} due to data loading issues.")
+        return None
+    
+    features, targets = data_result
     
     print(f"Feature matrix shape: {features.shape}")
     print(f"Target vector shape: {targets.shape}")
@@ -558,6 +717,10 @@ def analyze_dataset(dataset_name: str, args: argparse.Namespace):
     # Perform analysis
     results = analyze_features(dataset_name, args.top_k, args.data_dir)
     
+    if results is None:
+        print(f"Skipping {dataset_name} due to analysis issues.")
+        return
+    
     # Print results
     print_analysis_results(results, args.top_k)
     
@@ -567,20 +730,55 @@ def analyze_dataset(dataset_name: str, args: argparse.Namespace):
     
     # Extract and visualize top features if requested
     if args.visualize:
-        print(f"\nExtracting top {args.k} features for visualization...")
+        print(f"\nVisualizing features for {dataset_name}...")
         
         # Load original data for extraction
-        features, targets = load_dataset_data(dataset_name, args.data_dir)
+        data_result = load_dataset_data(dataset_name, args.data_dir)
+        if data_result is None:
+            print(f"Cannot visualize {dataset_name} due to data loading issues.")
+            return
         
-        # Extract top features
-        extracted_features, selected_indices = extract_top_features(features, results, args.k)
+        features, targets = data_result
+        n_features = features.shape[1]
         
-        print(f"Selected features: {selected_indices}")
-        print(f"Extracted features shape: {extracted_features.shape}")
-        
-        # Visualize
-        visualize_features(extracted_features, targets, selected_indices, 
-                        dataset_name, args.save_plot, args.plot_output)
+        if n_features <= 3:
+            # For 3 or fewer features, use all features
+            print(f"Using all {n_features} features for visualization...")
+            selected_indices = list(range(n_features))
+            extracted_features = features[:, selected_indices]
+            visualize_features(extracted_features, targets, selected_indices, 
+                            dataset_name, args.save_plot, args.plot_output)
+            
+        elif n_features <= 7:
+            # For 4-7 features, use all combinations of 2 and 3 features
+            print(f"Generating combinations of 2 and 3 features from {n_features} total features...")
+            combinations_list = get_feature_combinations(features, n_features)
+            print(f"Generated {len(combinations_list)} combinations for visualization")
+            
+            # Select best combinations based on clustering quality
+            best_combinations = select_best_combinations(combinations_list, targets, top_k=5)
+            
+            print(f"\nTop 5 best feature combinations:")
+            for i, (extracted_features, selected_indices, scores) in enumerate(best_combinations):
+                print(f"Rank {i+1}: Features {selected_indices} - Combined Score: {scores['combined_score']:.4f}")
+                print(f"  Silhouette: {scores['silhouette_score']:.4f}, Calinski-Harabasz: {scores['calinski_harabasz_score']:.2f}")
+                print(f"  Davies-Bouldin: {scores['davies_bouldin_score']:.4f}, Inertia: {scores['inertia']:.2f}")
+            
+            # Visualize only the best combinations
+            for i, (extracted_features, selected_indices, scores) in enumerate(best_combinations):
+                print(f"\nVisualizing best combination {i+1}/5: features {selected_indices}")
+                visualize_features(extracted_features, targets, selected_indices, 
+                                f"{dataset_name}_best_combo_{i+1}", args.save_plot, 
+                                f"{dataset_name}_best_combo_{i+1}_visualization.png" if args.save_plot else None)
+                
+        else:
+            # For more than 7 features, use extract_top_features
+            print(f"Using top {args.k} features from {n_features} total features...")
+            extracted_features, selected_indices = extract_top_features(features, results, args.k)
+            print(f"Selected features: {selected_indices}")
+            print(f"Extracted features shape: {extracted_features.shape}")
+            visualize_features(extracted_features, targets, selected_indices, 
+                            dataset_name, args.save_plot, args.plot_output)
 
 def main():
     """Main function to run feature analysis."""

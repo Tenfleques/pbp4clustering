@@ -88,13 +88,20 @@ class DatasetTester:
                 try:
                     pbp_result = pbp_vector(X[i])
                     reduced_samples.append(pbp_result)
-                    np.save(os.path.join(self.data_dir, f'{dataset_name}_pbp_features.npy'), reduced_samples)
+                    
                 except Exception as e:
                     print(f"Error processing sample {i}: {e}")
                     # Use original sample if reduction fails
                     reduced_samples.append(X[i].flatten())
         
-        return np.array(reduced_samples), "PBP"
+        reduced_samples = np.array(reduced_samples)
+        zero_columns = np.all(reduced_samples == 0, axis=0)
+        print(f"Has zero columns: {np.sum(zero_columns)} / {reduced_samples.shape[1]}")
+        reduced_samples = reduced_samples[:, ~zero_columns]
+
+        np.save(os.path.join(self.data_dir, f'{dataset_name}_pbp_features.npy'), reduced_samples)
+
+        return reduced_samples, "PBP"
     
     def apply_pca_reduction(self, X, n_components=3):
         """Apply PCA reduction as fallback."""
