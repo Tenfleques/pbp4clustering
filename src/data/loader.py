@@ -16,6 +16,8 @@ import json
 import io
 from sklearn.datasets import load_iris, load_breast_cancer, load_wine, load_digits
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.cluster import KMeans
+from itertools import combinations
 import warnings
 warnings.filterwarnings('ignore')
 import logging
@@ -28,6 +30,666 @@ class DatasetTransformer:
     def __init__(self):
         self.datasets = {}
         self.transformers = {}
+        
+    def adaptive_smart_reshape(self, X, target_rows=2, max_combinations=1000):
+        """
+        Adaptive smart reshaping that tries multiple strategies and selects the best one.
+        
+        This method automatically tries different rearrangement strategies and selects
+        the optimal approach based on comprehensive evaluation metrics:
+        1. Traditional homogeneity-only approach
+        2. Multi-objective optimization with different weight configurations
+        3. Feature importance-focused approach
+        4. Diversity-focused approach
+        5. Balanced multi-objective approach
+        
+        Args:
+            X: Input feature matrix (n_samples, n_features)
+            target_rows: Number of rows in the output matrix (2 or 3)
+            max_combinations: Maximum number of combinations to evaluate
+            
+        Returns:
+            Tuple of (reshaped_X, feature_groups, column_indices, best_strategy, evaluation_metrics)
+        """
+        print(f"Adaptive smart reshaping: trying multiple strategies for {X.shape[1]} features...")
+        
+        strategies = {
+            'homogeneity_only': {
+                'balance_weights': {'homogeneity': 1.0, 'importance': 0.0, 'diversity': 0.0, 'balance': 0.0},
+                'use_feature_importance': False,
+                'description': 'Traditional homogeneity-only approach'
+            },
+            'importance_focused': {
+                'balance_weights': {'homogeneity': 0.2, 'importance': 0.6, 'diversity': 0.1, 'balance': 0.1},
+                'use_feature_importance': True,
+                'description': 'Feature importance-focused approach'
+            },
+            'diversity_focused': {
+                'balance_weights': {'homogeneity': 0.2, 'importance': 0.2, 'diversity': 0.5, 'balance': 0.1},
+                'use_feature_importance': True,
+                'description': 'Feature diversity-focused approach'
+            },
+            'balanced': {
+                'balance_weights': {'homogeneity': 0.35, 'importance': 0.35, 'diversity': 0.2, 'balance': 0.1},
+                'use_feature_importance': True,
+                'description': 'Balanced multi-objective approach'
+            },
+            'homogeneity_focused': {
+                'balance_weights': {'homogeneity': 0.6, 'importance': 0.2, 'diversity': 0.1, 'balance': 0.1},
+                'use_feature_importance': True,
+                'description': 'Homogeneity-focused approach'
+            },
+            'transpose_optimized': {
+                'balance_weights': {'homogeneity': 0.4, 'importance': 0.3, 'diversity': 0.2, 'balance': 0.1},
+                'use_feature_importance': True,
+                'description': 'Transpose-optimized approach (ensure rows < columns)'
+            }
+        }
+        
+        best_result = None
+        best_score = float('inf')
+        best_strategy = None
+        all_evaluation_metrics = {}
+        
+        for strategy_name, strategy_config in strategies.items():
+            try:
+                print(f"  Testing {strategy_name}...")
+                
+                # Handle NaN values by replacing with 0
+                X_clean = X.copy()
+                if np.isnan(X_clean).any():
+                    print("    Warning: NaN values detected, replacing with 0")
+                    X_clean = np.nan_to_num(X_clean, nan=0.0)
+                
+                # Apply smart reshaping with current strategy
+                reshaped_X, feature_groups, col_indices, optimization_metrics = self.smart_reshape_with_homogeneity(
+                    X_clean, target_rows, max_combinations, 
+                    strategy_config['balance_weights'], 
+                    strategy_config['use_feature_importance']
+                )
+                
+                # For transpose_optimized strategy, check if we need to transpose
+                if strategy_name == 'transpose_optimized':
+                    # Check if current shape has more rows than columns
+                    if reshaped_X.shape[1] > reshaped_X.shape[2]:
+                        print(f"    Transposing matrix from {reshaped_X.shape[1]}x{reshaped_X.shape[2]} to {reshaped_X.shape[2]}x{reshaped_X.shape[1]}")
+                        # Transpose the matrix to ensure rows < columns
+                        reshaped_X = np.transpose(reshaped_X, (0, 2, 1))
+                        # Update feature groups accordingly
+                        feature_groups = self._transpose_feature_groups(feature_groups, reshaped_X.shape[1], reshaped_X.shape[2])
+                
+                # Evaluate the result using comprehensive metrics
+                evaluation_metrics = self._evaluate_reshaping_strategy(
+                    reshaped_X, feature_groups, optimization_metrics, strategy_config
+                )
+                
+                all_evaluation_metrics[strategy_name] = evaluation_metrics
+                
+                # Calculate combined score (lower is better)
+                combined_score = evaluation_metrics['combined_score']
+                
+                print(f"    Combined score: {combined_score:.4f}")
+                print(f"    Clustering quality: {evaluation_metrics['clustering_quality']:.4f}")
+                print(f"    Feature distribution: {evaluation_metrics['feature_distribution']:.4f}")
+                
+                if combined_score < best_score:
+                    best_score = combined_score
+                    best_result = (reshaped_X, feature_groups, col_indices, optimization_metrics)
+                    best_strategy = strategy_name
+                    
+            except Exception as e:
+                print(f"    Strategy {strategy_name} failed: {e}")
+                continue
+        
+        if best_result is None:
+            print("All strategies failed, using fallback approach...")
+            # Fallback: simple sequential grouping
+            reshaped_X, feature_groups, col_indices = self._fallback_reshaping(X, target_rows)
+            best_strategy = 'fallback'
+            evaluation_metrics = {'combined_score': float('inf'), 'clustering_quality': 0, 'feature_distribution': 0}
+            
+            print(f"Selected strategy: {best_strategy}")
+            print(f"Best combined score: inf")
+            
+            return reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics
+        else:
+            evaluation_metrics = all_evaluation_metrics[best_strategy]
+            
+            print(f"Selected strategy: {best_strategy}")
+            print(f"Best combined score: {best_score:.4f}")
+            
+            return best_result[0], best_result[1], best_result[2], best_strategy, evaluation_metrics
+    
+    def _evaluate_reshaping_strategy(self, reshaped_X, feature_groups, optimization_metrics, strategy_config):
+        """
+        Evaluate a reshaping strategy using comprehensive metrics.
+        
+        Args:
+            reshaped_X: Reshaped feature matrix
+            feature_groups: Feature groups for each row
+            optimization_metrics: Optimization metrics from smart reshaping
+            strategy_config: Configuration of the strategy
+            
+        Returns:
+            Dictionary with evaluation metrics
+        """
+        from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+        from sklearn.cluster import KMeans
+        
+        # Create synthetic target for clustering evaluation
+        synthetic_target = np.sum(reshaped_X.reshape(reshaped_X.shape[0], -1), axis=1)
+        n_clusters = min(5, len(np.unique(synthetic_target)))
+        
+        # Reshape to 2D for clustering
+        X_2d = reshaped_X.reshape(reshaped_X.shape[0], -1)
+        
+        # Perform clustering
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        cluster_labels = kmeans.fit_predict(X_2d)
+        
+        # Clustering quality metrics
+        clustering_metrics = {
+            'silhouette_score': silhouette_score(X_2d, cluster_labels),
+            'calinski_harabasz_score': calinski_harabasz_score(X_2d, cluster_labels),
+            'davies_bouldin_score': davies_bouldin_score(X_2d, cluster_labels),
+            'inertia': kmeans.inertia_
+        }
+        
+        # Feature distribution metrics
+        group_sizes = [len(group) for group in feature_groups]
+        feature_distribution_score = np.var(group_sizes)  # Lower is better
+        
+        # Column homogeneity (from optimization metrics)
+        homogeneity_score = optimization_metrics.get('homogeneity', 0)
+        
+        # Feature importance distribution (from optimization metrics)
+        importance_score = optimization_metrics.get('importance', 0)
+        
+        # Feature diversity (from optimization metrics)
+        diversity_score = -optimization_metrics.get('diversity', 0)  # Convert to positive
+        
+        # Balance score (from optimization metrics)
+        balance_score = optimization_metrics.get('balance', 0)
+        
+        # Calculate combined score (weighted average)
+        weights = {
+            'clustering_quality': 0.4,
+            'homogeneity': 0.2,
+            'feature_distribution': 0.2,
+            'importance': 0.1,
+            'diversity': 0.05,
+            'balance': 0.05
+        }
+        
+        # Add transpose optimization bonus (lower score is better)
+        transpose_bonus = 0.0
+        if reshaped_X.shape[1] < reshaped_X.shape[2]:  # Rows < columns
+            transpose_bonus = -0.1  # Bonus for optimal shape
+        elif reshaped_X.shape[1] > reshaped_X.shape[2]:  # Rows > columns
+            transpose_bonus = 0.1   # Penalty for suboptimal shape
+        
+        # Normalize clustering quality (higher is better, so invert)
+        clustering_quality = (
+            clustering_metrics['silhouette_score'] * 0.4 +
+            (1 / (1 + clustering_metrics['davies_bouldin_score'])) * 0.3 +
+            (1 / (1 + clustering_metrics['inertia'])) * 0.3
+        )
+        
+        combined_score = (
+            weights['clustering_quality'] * (1 - clustering_quality) +  # Invert for minimization
+            weights['homogeneity'] * (homogeneity_score / (1 + homogeneity_score)) +
+            weights['feature_distribution'] * (feature_distribution_score / (1 + feature_distribution_score)) +
+            weights['importance'] * (importance_score / (1 + importance_score)) +
+            weights['diversity'] * (diversity_score / (1 + diversity_score)) +
+            weights['balance'] * (balance_score / (1 + balance_score)) +
+            transpose_bonus  # Add transpose optimization bonus/penalty
+        )
+        
+        return {
+            'combined_score': combined_score,
+            'clustering_quality': clustering_quality,
+            'feature_distribution': feature_distribution_score,
+            'homogeneity': homogeneity_score,
+            'importance': importance_score,
+            'diversity': diversity_score,
+            'balance': balance_score,
+            'clustering_metrics': clustering_metrics
+        }
+    
+    def _transpose_feature_groups(self, feature_groups, new_rows, new_cols):
+        """
+        Transpose feature groups when matrix is transposed.
+        
+        Args:
+            feature_groups: Original feature groups
+            new_rows: Number of rows after transpose
+            new_cols: Number of columns after transpose
+            
+        Returns:
+            Transposed feature groups
+        """
+        # When transposing, we need to redistribute features
+        # This is a simplified approach - in practice, you might want more sophisticated logic
+        total_features = sum(len(group) for group in feature_groups)
+        
+        # Create new feature groups based on the transposed dimensions
+        new_feature_groups = []
+        for i in range(new_rows):
+            # Distribute features evenly across new rows
+            start_idx = i * (total_features // new_rows)
+            end_idx = (i + 1) * (total_features // new_rows) if i < new_rows - 1 else total_features
+            new_feature_groups.append(np.arange(start_idx, end_idx))
+        
+        return new_feature_groups
+    
+    def _fallback_reshaping(self, X, target_rows):
+        """
+        Fallback reshaping using simple sequential grouping.
+        
+        Args:
+            X: Input feature matrix
+            target_rows: Number of target rows
+            
+        Returns:
+            Tuple of (reshaped_X, feature_groups, column_indices)
+        """
+        # Handle NaN values by replacing with 0
+        if np.isnan(X).any():
+            print("Warning: NaN values detected, replacing with 0")
+            X = np.nan_to_num(X, nan=0.0)
+        
+        n_samples, n_features = X.shape
+        target_cols = n_features // target_rows
+        
+        if n_features % target_rows != 0:
+            features_to_drop = n_features % target_rows
+            X = X[:, :-features_to_drop]
+            n_features = X.shape[1]
+            target_cols = n_features // target_rows
+        
+        # Simple sequential grouping
+        feature_groups = [np.arange(i, n_features, target_rows) for i in range(target_rows)]
+        
+        # Create reshaped matrix
+        reshaped_X = np.zeros((n_samples, target_rows, target_cols))
+        for row_idx, group in enumerate(feature_groups):
+            if len(group) >= target_cols:
+                reshaped_X[:, row_idx, :] = X[:, group[:target_cols]]
+            else:
+                reshaped_X[:, row_idx, :len(group)] = X[:, group]
+        
+        return reshaped_X, feature_groups, np.arange(target_cols)
+    
+    def smart_reshape_with_homogeneity(self, X, target_rows=2, max_combinations=1000, 
+                                     balance_weights=None, use_feature_importance=True):
+        n_samples, n_features = X.shape
+        target_cols = n_features // target_rows
+        
+        if n_features % target_rows != 0:
+            # Drop features to make it divisible
+            features_to_drop = n_features % target_rows
+            X = X[:, :-features_to_drop]
+            n_features = X.shape[1]
+            target_cols = n_features // target_rows
+            print(f"Dropped {features_to_drop} features to make {n_features} divisible by {target_rows}")
+        
+        print(f"Analyzing {n_features} features for {target_rows}x{target_cols} matrix...")
+        
+        # Set default balance weights if not provided
+        if balance_weights is None:
+            balance_weights = {
+                'homogeneity': 0.4,      # Column homogeneity
+                'importance': 0.3,        # Feature importance
+                'diversity': 0.2,         # Feature diversity
+                'balance': 0.1            # Group balance
+            }
+        
+        # Calculate feature importance using multiple methods
+        feature_importance = self._calculate_feature_importance(X) if use_feature_importance else None
+        
+        # Calculate feature similarities and characteristics
+        feature_vars = np.var(X, axis=0)
+        feature_corrs = np.corrcoef(X.T)
+        
+        # Create enhanced feature similarity matrix
+        feature_similarity = self._create_enhanced_similarity_matrix(
+            X, feature_vars, feature_corrs, feature_importance, balance_weights
+        )
+        
+        # Find optimal feature grouping using multi-objective optimization
+        best_grouping = None
+        best_score = float('inf')
+        best_metrics = None
+        
+        # Try different clustering approaches
+        for n_clusters in [2, 3, 4, 5]:
+            if n_clusters > n_features:
+                continue
+                
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            cluster_labels = kmeans.fit_predict(feature_similarity)
+            
+            # Group features by cluster
+            feature_groups = []
+            for cluster_id in range(n_clusters):
+                group = np.where(cluster_labels == cluster_id)[0]
+                if len(group) > 0:
+                    feature_groups.append(group)
+            
+            # Evaluate this grouping with multi-objective scoring
+            score, metrics = self._evaluate_multi_objective_grouping(
+                X, feature_groups, target_rows, feature_importance, balance_weights
+            )
+            
+            if score < best_score:
+                best_score = score
+                best_grouping = feature_groups
+                best_metrics = metrics
+        
+        if best_grouping is None:
+            # Fallback: simple sequential grouping
+            best_grouping = [np.arange(i, n_features, target_rows) for i in range(target_rows)]
+            best_metrics = self._evaluate_multi_objective_grouping(
+                X, best_grouping, target_rows, feature_importance, balance_weights
+            )[1]
+        
+        # Create the reshaped matrix
+        reshaped_X = np.zeros((n_samples, target_rows, target_cols))
+        feature_groups_final = []
+        
+        # Ensure we have exactly target_rows groups
+        if len(best_grouping) < target_rows:
+            # Pad with empty groups
+            while len(best_grouping) < target_rows:
+                best_grouping.append(np.array([]))
+        elif len(best_grouping) > target_rows:
+            # Take only the first target_rows groups
+            best_grouping = best_grouping[:target_rows]
+        
+        for row_idx, group in enumerate(best_grouping):
+            if len(group) >= target_cols:
+                # Take the first target_cols features from this group
+                selected_features = group[:target_cols]
+                reshaped_X[:, row_idx, :] = X[:, selected_features]
+                feature_groups_final.append(selected_features)
+            elif len(group) > 0:
+                # Use available features and pad with zeros
+                reshaped_X[:, row_idx, :len(group)] = X[:, group]
+                feature_groups_final.append(group)
+            else:
+                # Empty group, leave as zeros
+                feature_groups_final.append(np.array([]))
+        
+        print(f"Smart reshaping completed. Best multi-objective score: {best_score:.4f}")
+        print(f"Optimization metrics: {best_metrics}")
+        return reshaped_X, feature_groups_final, np.arange(target_cols), best_metrics
+    
+    def _calculate_feature_importance(self, X):
+        """
+        Calculate feature importance using multiple methods.
+        
+        Args:
+            X: Input feature matrix
+            
+        Returns:
+            Dictionary with different importance measures
+        """
+        n_samples, n_features = X.shape
+        
+        # Method 1: Variance-based importance
+        variance_importance = np.var(X, axis=0)
+        
+        # Method 2: Correlation-based importance (average absolute correlation)
+        corr_matrix = np.abs(np.corrcoef(X.T))
+        correlation_importance = np.mean(corr_matrix, axis=1)
+        
+        # Method 3: Information gain approximation (using mutual information)
+        from sklearn.feature_selection import mutual_info_regression
+        try:
+            # Create synthetic target for mutual information calculation
+            synthetic_target = np.sum(X, axis=1)  # Simple aggregation
+            mi_importance = mutual_info_regression(X, synthetic_target, random_state=42)
+        except:
+            mi_importance = np.ones(n_features)  # Fallback
+        
+        # Method 4: Statistical significance (F-score approximation)
+        try:
+            from sklearn.feature_selection import f_regression
+            f_scores, _ = f_regression(X, synthetic_target)
+            f_importance = f_scores
+        except:
+            f_importance = np.ones(n_features)  # Fallback
+        
+        # Combine all importance measures
+        importance_scores = {
+            'variance': variance_importance,
+            'correlation': correlation_importance,
+            'mutual_info': mi_importance,
+            'f_score': f_importance,
+            'combined': (variance_importance + correlation_importance + mi_importance + f_importance) / 4
+        }
+        
+        return importance_scores
+    
+    def _create_enhanced_similarity_matrix(self, X, feature_vars, feature_corrs, feature_importance, balance_weights):
+        """
+        Create enhanced similarity matrix considering multiple objectives.
+        
+        Args:
+            X: Input feature matrix
+            feature_vars: Feature variances
+            feature_corrs: Feature correlation matrix
+            feature_importance: Feature importance scores
+            balance_weights: Weights for different objectives
+            
+        Returns:
+            Enhanced similarity matrix
+        """
+        n_features = X.shape[1]
+        feature_similarity = np.zeros((n_features, n_features))
+        
+        for i in range(n_features):
+            for j in range(n_features):
+                if i != j:
+                    # 1. Homogeneity component (variance similarity)
+                    var_sim = 1 / (1 + abs(feature_vars[i] - feature_vars[j]))
+                    
+                    # 2. Correlation component
+                    corr_sim = abs(feature_corrs[i, j])
+                    
+                    # 3. Importance component (if available)
+                    if feature_importance is not None:
+                        importance_sim = 1 - abs(feature_importance['combined'][i] - feature_importance['combined'][j])
+                    else:
+                        importance_sim = 0.5
+                    
+                    # 4. Diversity component (complement of correlation)
+                    diversity_sim = 1 - corr_sim
+                    
+                    # Combine all components with weights
+                    similarity = (
+                        balance_weights['homogeneity'] * var_sim +
+                        balance_weights['importance'] * importance_sim +
+                        balance_weights['diversity'] * diversity_sim +
+                        (1 - balance_weights['homogeneity'] - balance_weights['importance'] - balance_weights['diversity']) * corr_sim
+                    )
+                    
+                    feature_similarity[i, j] = similarity
+        
+        return feature_similarity
+    
+    def _evaluate_multi_objective_grouping(self, X, feature_groups, target_rows, feature_importance, balance_weights):
+        """
+        Evaluate feature grouping using multiple objectives.
+        
+        Args:
+            X: Input feature matrix
+            feature_groups: List of feature groups
+            target_rows: Number of target rows
+            feature_importance: Feature importance scores
+            balance_weights: Weights for different objectives
+            
+        Returns:
+            Tuple of (combined_score, metrics_dict)
+        """
+        if len(feature_groups) < target_rows:
+            return float('inf'), {}
+        
+        metrics = {}
+        
+        # 1. Homogeneity score (column variance)
+        homogeneity_score = self._evaluate_grouping(X, feature_groups, target_rows)
+        metrics['homogeneity'] = homogeneity_score
+        
+        # 2. Importance score (feature importance distribution)
+        if feature_importance is not None:
+            importance_score = self._evaluate_importance_distribution(feature_groups, feature_importance)
+            metrics['importance'] = importance_score
+        else:
+            metrics['importance'] = 0
+        
+        # 3. Diversity score (feature diversity within groups)
+        diversity_score = self._evaluate_feature_diversity(X, feature_groups)
+        metrics['diversity'] = diversity_score
+        
+        # 4. Balance score (group size balance)
+        balance_score = self._evaluate_group_balance(feature_groups, target_rows)
+        metrics['balance'] = balance_score
+        
+        # Combine scores with weights
+        combined_score = (
+            balance_weights['homogeneity'] * homogeneity_score +
+            balance_weights['importance'] * metrics['importance'] +
+            balance_weights['diversity'] * diversity_score +
+            balance_weights['balance'] * balance_score
+        )
+        
+        return combined_score, metrics
+    
+    def _evaluate_importance_distribution(self, feature_groups, feature_importance):
+        """
+        Evaluate how well important features are distributed across groups.
+        
+        Args:
+            feature_groups: List of feature groups
+            feature_importance: Feature importance scores
+            
+        Returns:
+            Importance distribution score (lower is better)
+        """
+        if not feature_groups or feature_importance is None:
+            return 0
+        
+        # Calculate importance scores for each group
+        group_importances = []
+        for group in feature_groups:
+            if len(group) > 0:
+                group_importance = np.mean(feature_importance['combined'][group])
+                group_importances.append(group_importance)
+        
+        if not group_importances:
+            return 0
+        
+        # Calculate variance of group importances (we want balanced distribution)
+        importance_variance = np.var(group_importances)
+        
+        return importance_variance
+    
+    def _evaluate_feature_diversity(self, X, feature_groups):
+        """
+        Evaluate feature diversity within groups.
+        
+        Args:
+            X: Input feature matrix
+            feature_groups: List of feature groups
+            
+        Returns:
+            Diversity score (higher is better, so we return negative for minimization)
+        """
+        if not feature_groups:
+            return 0
+        
+        total_diversity = 0
+        total_features = 0
+        
+        for group in feature_groups:
+            if len(group) > 1:
+                # Calculate average pairwise correlation within group
+                group_data = X[:, group]
+                corr_matrix = np.abs(np.corrcoef(group_data.T))
+                # Remove diagonal elements
+                corr_matrix = corr_matrix[np.triu_indices_from(corr_matrix, k=1)]
+                avg_correlation = np.mean(corr_matrix)
+                # Diversity is inverse of correlation
+                group_diversity = 1 - avg_correlation
+                total_diversity += group_diversity * len(group)
+                total_features += len(group)
+        
+        if total_features == 0:
+            return 0
+        
+        # Return negative because we want to minimize in optimization
+        return -total_diversity / total_features
+    
+    def _evaluate_group_balance(self, feature_groups, target_rows):
+        """
+        Evaluate balance of feature distribution across groups.
+        
+        Args:
+            feature_groups: List of feature groups
+            target_rows: Number of target rows
+            
+        Returns:
+            Balance score (lower is better)
+        """
+        if not feature_groups:
+            return 0
+        
+        group_sizes = [len(group) for group in feature_groups]
+        
+        # Calculate variance of group sizes
+        size_variance = np.var(group_sizes)
+        
+        # Penalty for having fewer groups than target
+        size_penalty = max(0, target_rows - len(feature_groups)) * 10
+        
+        return size_variance + size_penalty
+    
+    def _evaluate_grouping(self, X, feature_groups, target_rows):
+        """
+        Evaluate the quality of a feature grouping based on column homogeneity.
+        
+        Args:
+            X: Input feature matrix
+            feature_groups: List of feature indices for each row
+            target_rows: Number of rows in target matrix
+            
+        Returns:
+            Homogeneity score (lower is better)
+        """
+        if len(feature_groups) < target_rows:
+            return float('inf')
+        
+        total_score = 0
+        n_samples = X.shape[0]
+        
+        # For each column position, evaluate homogeneity across rows
+        max_cols = max(len(group) for group in feature_groups[:target_rows])
+        
+        for col_idx in range(max_cols):
+            column_values = []
+            for row_idx in range(target_rows):
+                if col_idx < len(feature_groups[row_idx]):
+                    feature_idx = feature_groups[row_idx][col_idx]
+                    column_values.append(X[:, feature_idx])
+            
+            if len(column_values) > 1:
+                # Calculate variance within this column across rows
+                column_matrix = np.column_stack(column_values)
+                column_var = np.var(column_matrix, axis=1).mean()
+                total_score += column_var
+        
+        return total_score
         
     def load_iris_dataset(self):
         """Load and transform Iris dataset into 2x2 matrices."""
@@ -350,7 +1012,7 @@ class DatasetTransformer:
         return self.datasets['sonar']
     
     def load_glass_dataset(self):
-        """Load and transform Glass dataset into 3x3 matrices."""
+        """Load and transform Glass dataset using smart reshaping for homogeneity."""
         print("Loading Glass dataset...")
         
         url = "https://archive.ics.uci.edu/ml/machine-learning-databases/glass/glass.data"
@@ -360,39 +1022,38 @@ class DatasetTransformer:
             print("Failed to load Glass dataset")
             return None
         
-        # Reshape from 1x9 to 3x3 matrices (pad if needed)
-        # Rows: [Alkali Metals, Alkaline Earth, Transition Metals]
-        # Columns: 3 measurements each
-        if X.shape[1] % 9 != 0:
-            padding = 9 - (X.shape[1] % 9)
-            X = np.pad(X, ((0, 0), (0, padding)), mode='constant')
-        
-        # Reshape to 3x3 matrices - this may change the sample count
-        X = X.reshape(-1, 3, 3)
+        print("Applying adaptive smart reshaping with automatic strategy selection...")
+        # Use adaptive smart reshaping that tries multiple strategies and selects the best
+        reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+            X, target_rows=2
+        )
         
         # Adjust target array to match new sample count if needed
-        # If reshaping changed the sample count, duplicate labels accordingly
-        if X.shape[0] != len(y):
-            samples_per_original = X.shape[0] // len(y)
+        if reshaped_X.shape[0] != len(y):
+            samples_per_original = reshaped_X.shape[0] // len(y)
             y = np.repeat(y, samples_per_original)
         
-        feature_names = ['Alkali Metals', 'Alkaline Earth', 'Transition Metals']
-        measurement_names = [f'Element_{i+1}' for i in range(3)]
+        feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+        measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
         
         self.datasets['glass'] = {
-            'X': X,
+            'X': reshaped_X,
             'y': y,
             'feature_names': feature_names,
             'measurement_names': measurement_names,
             'target_names': [f'Glass_Type_{i}' for i in range(len(np.unique(y)))],
-            'description': 'Glass composition reshaped to 3x3 matrices'
+            'description': f'Glass composition adaptive smart reshaping with automatic strategy selection (2x5 matrices) - Best strategy: {best_strategy}',
+            'feature_groups': feature_groups,
+            'reshaping_method': 'adaptive_smart_reshape',
+            'selected_strategy': best_strategy,
+            'evaluation_metrics': evaluation_metrics
         }
         
-        print(f"Glass dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+        print(f"Glass dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
         return self.datasets['glass']
     
     def load_vehicle_dataset(self):
-        """Load and transform Vehicle Silhouettes dataset into 4x9 matrices."""
+        """Load and transform Vehicle Silhouettes dataset using smart reshaping for homogeneity."""
         print("Loading Vehicle Silhouettes dataset...")
         
         # Try multiple URLs for the vehicle dataset
@@ -439,36 +1100,35 @@ class DatasetTransformer:
         # Convert target to numeric
         y = pd.Categorical(y).codes
         
-        # Vehicle dataset has 18 features, we'll drop 2 to get 16 features for 4x4 matrix
-        # This avoids padding and creates a clean factorization
         print(f"Original Vehicle shape: {X.shape}")
+        print("Applying adaptive smart reshaping with automatic strategy selection...")
         
-        # Drop 2 features to get 16 features for 4x4 matrix
-        X_16 = X[:, :-2]  # Remove last 2 columns
-        print(f"After dropping 2 features: {X_16.shape}")
+        # Use adaptive smart reshaping that tries multiple strategies and selects the best
+        reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+            X, target_rows=3
+        )
         
-        # Reshape to 4x4 matrices (16 features)
-        # Rows: [Front, Back, Side, Top]
-        # Columns: 4 geometric measurements per region
-        X = X_16.reshape(-1, 4, 4)
-        
-        feature_names = ['Front', 'Back', 'Side', 'Top']
-        measurement_names = [f'Geometric_{i+1}' for i in range(4)]
+        feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+        measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
         
         self.datasets['vehicle'] = {
-            'X': X,
+            'X': reshaped_X,
             'y': y,
             'feature_names': feature_names,
             'measurement_names': measurement_names,
             'target_names': ['Bus', 'Opel', 'Saab', 'Van'],
-            'description': 'Vehicle silhouettes reshaped to 4x4 matrices (dropped 2 features)'
+            'description': f'Vehicle silhouettes adaptive smart reshaping with automatic strategy selection (3x6 matrices) - Best strategy: {best_strategy}',
+            'feature_groups': feature_groups,
+            'reshaping_method': 'adaptive_smart_reshape',
+            'selected_strategy': best_strategy,
+            'evaluation_metrics': evaluation_metrics
         }
         
-        print(f"Vehicle dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+        print(f"Vehicle dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
         return self.datasets['vehicle']
     
     def load_ecoli_dataset(self):
-        """Load and transform Ecoli dataset into 2x7 matrices."""
+        """Load and transform Ecoli dataset using smart reshaping for homogeneity."""
         print("Loading Ecoli dataset...")
         
         url = "https://archive.ics.uci.edu/ml/machine-learning-databases/ecoli/ecoli.data"
@@ -501,36 +1161,35 @@ class DatasetTransformer:
             print(f"Failed to load Ecoli dataset: {e}")
             return None
         
-        # Ecoli dataset has 7 features, we'll drop 1 to get 6 features for 2x3 matrix
-        # This avoids padding and creates a clean factorization
         print(f"Original Ecoli shape: {X.shape}")
+        print("Applying adaptive smart reshaping with automatic strategy selection...")
         
-        # Drop 1 feature to get 6 features for 2x3 matrix
-        X_6 = X[:, :-1]  # Remove last column
-        print(f"After dropping 1 feature: {X_6.shape}")
+        # Use adaptive smart reshaping that tries multiple strategies and selects the best
+        reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+            X, target_rows=2
+        )
         
-        # Reshape to 2x3 matrices (6 features)
-        # Rows: [Cytoplasmic, Membrane]
-        # Columns: 3 amino acid composition measurements
-        X = X_6.reshape(-1, 2, 3)
-        
-        feature_names = ['Cytoplasmic', 'Membrane']
-        measurement_names = [f'Amino_Acid_{i+1}' for i in range(3)]
+        feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+        measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
         
         self.datasets['ecoli'] = {
-            'X': X,
+            'X': reshaped_X,
             'y': y,
             'feature_names': feature_names,
             'measurement_names': measurement_names,
             'target_names': ['cp', 'im', 'pp', 'imU', 'om', 'omL', 'imL', 'imS'],
-            'description': 'Ecoli protein localization reshaped to 2x3 matrices (dropped 1 feature)'
+            'description': f'Ecoli protein localization adaptive smart reshaping with automatic strategy selection (2x3 matrices) - Best strategy: {best_strategy}',
+            'feature_groups': feature_groups,
+            'reshaping_method': 'adaptive_smart_reshape',
+            'selected_strategy': best_strategy,
+            'evaluation_metrics': evaluation_metrics
         }
         
-        print(f"Ecoli dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+        print(f"Ecoli dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
         return self.datasets['ecoli']
     
     def load_yeast_dataset(self):
-        """Load and transform Yeast dataset into 3x8 matrices."""
+        """Load and transform Yeast dataset using smart reshaping for homogeneity."""
         print("Loading Yeast dataset...")
         
         url = "https://archive.ics.uci.edu/ml/machine-learning-databases/yeast/yeast.data"
@@ -563,36 +1222,35 @@ class DatasetTransformer:
             print(f"Failed to load Yeast dataset: {e}")
             return None
         
-        # Yeast dataset has 8 features, we'll drop 2 to get 6 features for 3x2 matrix
-        # This avoids padding and creates a clean factorization
         print(f"Original Yeast shape: {X.shape}")
+        print("Applying adaptive smart reshaping with automatic strategy selection...")
         
-        # Drop 2 features to get 6 features for 3x2 matrix
-        X_6 = X[:, :-2]  # Remove last 2 columns
-        print(f"After dropping 2 features: {X_6.shape}")
+        # Use adaptive smart reshaping that tries multiple strategies and selects the best
+        reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+            X, target_rows=2
+        )
         
-        # Reshape to 3x2 matrices (6 features)
-        # Rows: [Cytoplasm, Nucleus, Membrane]
-        # Columns: 2 protein sequence features
-        X = X_6.reshape(-1, 3, 2)
-        
-        feature_names = ['Cytoplasm', 'Nucleus', 'Membrane']
-        measurement_names = [f'Sequence_Feature_{i+1}' for i in range(2)]
+        feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+        measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
         
         self.datasets['yeast'] = {
-            'X': X,
+            'X': reshaped_X,
             'y': y,
             'feature_names': feature_names,
             'measurement_names': measurement_names,
             'target_names': ['CYT', 'NUC', 'MIT', 'ME3', 'ME2', 'EXC', 'VAC', 'POX', 'ERL'],
-            'description': 'Yeast subcellular localization reshaped to 3x2 matrices (dropped 2 features)'
+            'description': f'Yeast subcellular localization adaptive smart reshaping with automatic strategy selection (2x4 matrices) - Best strategy: {best_strategy}',
+            'feature_groups': feature_groups,
+            'reshaping_method': 'adaptive_smart_reshape',
+            'selected_strategy': best_strategy,
+            'evaluation_metrics': evaluation_metrics
         }
         
-        print(f"Yeast dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+        print(f"Yeast dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
         return self.datasets['yeast']
     
     def load_seeds_dataset(self):
-        """Load and transform Seeds (Wheat Kernel) dataset into matrix format."""
+        """Load and transform Seeds (Wheat Kernel) dataset using adaptive smart reshaping."""
         print("Loading Seeds dataset...")
         
         try:
@@ -607,20 +1265,40 @@ class DatasetTransformer:
                 if isinstance(metadata, list):
                     metadata = metadata[0] if metadata else {}
             
-            feature_names = ['Morphological_Measurements']
-            measurement_names = ['Area', 'Perimeter', 'Compactness', 'Length', 'Width', 'Asymmetry', 'GrooveLength']
+            print(f"Original Seeds shape: {X.shape}")
+            
+            # Flatten the 3D array to 2D for adaptive reshaping
+            if X.ndim == 3:
+                X_2d = X.reshape(X.shape[0], -1)
+                print(f"Flattened to 2D shape: {X_2d.shape}")
+            else:
+                X_2d = X
+            
+            print("Applying adaptive smart reshaping with automatic strategy selection...")
+            
+            # Use adaptive smart reshaping with maximum 3 rows
+            reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+                X_2d, target_rows=3
+            )
+            
+            # Generate feature names based on the reshaping
+            feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+            measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
             
             self.datasets['seeds'] = {
-                'X': X,
+                'X': reshaped_X,
                 'y': y,
                 'feature_names': feature_names,
                 'measurement_names': measurement_names,
                 'target_names': ['Wheat_Variety'],
-                'description': metadata.get('transformation_rationale', 'Seeds morphological measurements'),
-                'metadata': metadata
+                'description': f'Seeds morphological measurements adaptive smart reshaping with automatic strategy selection - Best strategy: {best_strategy}',
+                'metadata': metadata,
+                'reshaping_method': 'adaptive_smart_reshape',
+                'selected_strategy': best_strategy,
+                'evaluation_metrics': evaluation_metrics
             }
             
-            print(f"Seeds dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+            print(f"Seeds dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
             return self.datasets['seeds']
             
         except Exception as e:
@@ -628,7 +1306,7 @@ class DatasetTransformer:
             return None
     
     def load_thyroid_dataset(self):
-        """Load and transform Thyroid Gland dataset into matrix format."""
+        """Load and transform Thyroid Gland dataset using adaptive smart reshaping."""
         print("Loading Thyroid dataset...")
         
         try:
@@ -643,20 +1321,40 @@ class DatasetTransformer:
                 if isinstance(metadata, list):
                     metadata = metadata[0] if metadata else {}
             
-            feature_names = ['Thyroid_Function_Tests']
-            measurement_names = ['RT3U', 'TSH', 'T3', 'TT4', 'T4U', 'FTI']
+            print(f"Original Thyroid shape: {X.shape}")
+            
+            # Flatten the 3D array to 2D for adaptive reshaping
+            if X.ndim == 3:
+                X_2d = X.reshape(X.shape[0], -1)
+                print(f"Flattened to 2D shape: {X_2d.shape}")
+            else:
+                X_2d = X
+            
+            print("Applying adaptive smart reshaping with automatic strategy selection...")
+            
+            # Use adaptive smart reshaping with maximum 3 rows
+            reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+                X_2d, target_rows=3
+            )
+            
+            # Generate feature names based on the reshaping
+            feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+            measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
             
             self.datasets['thyroid'] = {
-                'X': X,
+                'X': reshaped_X,
                 'y': y,
                 'feature_names': feature_names,
                 'measurement_names': measurement_names,
                 'target_names': ['Thyroid_State'],
-                'description': metadata.get('transformation_rationale', 'Thyroid function laboratory tests'),
-                'metadata': metadata
+                'description': f'Thyroid function laboratory tests adaptive smart reshaping with automatic strategy selection - Best strategy: {best_strategy}',
+                'metadata': metadata,
+                'reshaping_method': 'adaptive_smart_reshape',
+                'selected_strategy': best_strategy,
+                'evaluation_metrics': evaluation_metrics
             }
             
-            print(f"Thyroid dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+            print(f"Thyroid dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
             return self.datasets['thyroid']
             
         except Exception as e:
@@ -700,7 +1398,7 @@ class DatasetTransformer:
             return None
     
     def load_ionosphere_dataset(self):
-        """Load and transform Ionosphere dataset into matrix format."""
+        """Load and transform Ionosphere dataset using adaptive smart reshaping."""
         print("Loading Ionosphere dataset...")
         
         try:
@@ -715,20 +1413,40 @@ class DatasetTransformer:
                 if isinstance(metadata, list):
                     metadata = metadata[0] if metadata else {}
             
-            feature_names = [f'Pulse_{i+1}' for i in range(17)]
-            measurement_names = ['InPhase', 'QuadPhase']
+            print(f"Original Ionosphere shape: {X.shape}")
+            
+            # Flatten the 3D array to 2D for adaptive reshaping
+            if X.ndim == 3:
+                X_2d = X.reshape(X.shape[0], -1)
+                print(f"Flattened to 2D shape: {X_2d.shape}")
+            else:
+                X_2d = X
+            
+            print("Applying adaptive smart reshaping with automatic strategy selection...")
+            
+            # Use adaptive smart reshaping with maximum 3 rows
+            reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+                X_2d, target_rows=3
+            )
+            
+            # Generate feature names based on the reshaping
+            feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+            measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
             
             self.datasets['ionosphere'] = {
-                'X': X,
+                'X': reshaped_X,
                 'y': y,
                 'feature_names': feature_names,
                 'measurement_names': measurement_names,
                 'target_names': ['Radar_Return_Quality'],
-                'description': metadata.get('transformation_rationale', 'Radar signals with in-phase and quadrature components'),
-                'metadata': metadata
+                'description': f'Radar signals with in-phase and quadrature components adaptive smart reshaping with automatic strategy selection - Best strategy: {best_strategy}',
+                'metadata': metadata,
+                'reshaping_method': 'adaptive_smart_reshape',
+                'selected_strategy': best_strategy,
+                'evaluation_metrics': evaluation_metrics
             }
             
-            print(f"Ionosphere dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+            print(f"Ionosphere dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
             return self.datasets['ionosphere']
             
         except Exception as e:
@@ -818,7 +1536,7 @@ class DatasetTransformer:
             return None
 
     def load_covertype_dataset(self):
-        """Load and transform Covertype dataset into 6x9 matrices."""
+        """Load and transform Covertype dataset using adaptive smart reshaping with maximum 3 rows."""
         print("Loading Covertype dataset...")
         
         try:
@@ -830,29 +1548,34 @@ class DatasetTransformer:
             y = covertype.data.targets.values.flatten()
             
             print(f"Original Covertype shape: {X.shape}")
+            print("Applying adaptive smart reshaping with automatic strategy selection...")
             
-            # Reshape to 6x9 matrices (54 features)
-            # Rows: [Topographic, Wilderness, Soil_Type1, Soil_Type2, Soil_Type3, Soil_Type4]
-            # Columns: 9 measurements each
-            X = X.reshape(-1, 6, 9)
+            # Use adaptive smart reshaping with maximum 3 rows
+            reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+                X, target_rows=3
+            )
             
-            feature_names = ['Topographic', 'Wilderness', 'Soil_Type1', 'Soil_Type2', 'Soil_Type3', 'Soil_Type4']
-            measurement_names = [f'Measurement_{i+1}' for i in range(9)]
+            # Generate feature names based on the reshaping
+            feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+            measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
             
             # Map target values to class names
             target_names = ['Spruce/Fir', 'Lodgepole_Pine', 'Ponderosa_Pine', 'Cottonwood/Willow', 
                           'Aspen', 'Douglas-fir', 'Krummholz']
             
             self.datasets['covertype'] = {
-                'X': X,
+                'X': reshaped_X,
                 'y': y,
                 'feature_names': feature_names,
                 'measurement_names': measurement_names,
                 'target_names': target_names,
-                'description': 'Covertype dataset reshaped to 6x9 matrices'
+                'description': f'Covertype dataset adaptive smart reshaping with automatic strategy selection - Best strategy: {best_strategy}',
+                'reshaping_method': 'adaptive_smart_reshape',
+                'selected_strategy': best_strategy,
+                'evaluation_metrics': evaluation_metrics
             }
             
-            print(f"Covertype dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+            print(f"Covertype dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
             return self.datasets['covertype']
             
         except ImportError:
@@ -864,24 +1587,33 @@ class DatasetTransformer:
             X = np.random.randn(n_samples, n_features)
             y = np.random.randint(0, 7, n_samples)
             
-            # Reshape to 6x9 matrices
-            X = X.reshape(-1, 6, 9)
+            print(f"Original synthetic Covertype shape: {X.shape}")
+            print("Applying adaptive smart reshaping with automatic strategy selection...")
             
-            feature_names = ['Topographic', 'Wilderness', 'Soil_Type1', 'Soil_Type2', 'Soil_Type3', 'Soil_Type4']
-            measurement_names = [f'Measurement_{i+1}' for i in range(9)]
+            # Use adaptive smart reshaping with maximum 3 rows
+            reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+                X, target_rows=3
+            )
+            
+            # Generate feature names based on the reshaping
+            feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+            measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
             target_names = ['Spruce/Fir', 'Lodgepole_Pine', 'Ponderosa_Pine', 'Cottonwood/Willow', 
                           'Aspen', 'Douglas-fir', 'Krummholz']
             
             self.datasets['covertype'] = {
-                'X': X,
+                'X': reshaped_X,
                 'y': y,
                 'feature_names': feature_names,
                 'measurement_names': measurement_names,
                 'target_names': target_names,
-                'description': 'Synthetic Covertype dataset reshaped to 6x9 matrices'
+                'description': f'Synthetic Covertype dataset adaptive smart reshaping with automatic strategy selection - Best strategy: {best_strategy}',
+                'reshaping_method': 'adaptive_smart_reshape',
+                'selected_strategy': best_strategy,
+                'evaluation_metrics': evaluation_metrics
             }
             
-            print(f"Synthetic Covertype dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+            print(f"Synthetic Covertype dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
             return self.datasets['covertype']
             
         except Exception as e:
@@ -928,11 +1660,11 @@ class DatasetTransformer:
             return None
 
     def load_kddcup99_dataset(self):
-        """Load and transform KDD Cup 99 dataset into 5x8 matrices (dropped one feature)."""
+        """Load and transform KDD Cup 99 dataset using adaptive smart reshaping with maximum 3 rows."""
         print("Loading KDD Cup 99 dataset...")
         
         try:
-            # KDD Cup 99 has 41 features, we'll drop one to get 40 features for 5x8 matrix
+            # KDD Cup 99 has 41 features, we'll use adaptive reshaping with maximum 3 rows
             # For analysis, we'll create synthetic data with similar structure
             n_samples = 1000
             n_features = 41
@@ -941,30 +1673,33 @@ class DatasetTransformer:
             X = np.random.randn(n_samples, n_features)
             y = np.random.randint(0, 5, n_samples)  # 5 attack types
             
-            # Drop one feature to get 40 features for 5x8 matrix
-            # This avoids padding and creates a clean factorization
-            X_40 = X[:, :-1]  # Remove last column
             print(f"Original KDD Cup 99 shape: {X.shape}")
-            print(f"After dropping one feature: {X_40.shape}")
+            print("Applying adaptive smart reshaping with automatic strategy selection...")
             
-            # Reshape to 5x8 matrices
-            X = X_40.reshape(-1, 5, 8)
+            # Use adaptive smart reshaping with maximum 3 rows
+            reshaped_X, feature_groups, col_indices, best_strategy, evaluation_metrics = self.adaptive_smart_reshape(
+                X, target_rows=3
+            )
             
-            feature_names = ['Basic', 'Content', 'Traffic', 'Host', 'Time']
-            measurement_names = [f'Feature_{i+1}' for i in range(8)]
+            # Generate feature names based on the reshaping
+            feature_names = [f'Group_{i+1}' for i in range(reshaped_X.shape[1])]
+            measurement_names = [f'Measurement_{i+1}' for i in range(reshaped_X.shape[2])]
             
             target_names = ['normal', 'dos', 'probe', 'r2l', 'u2r']
             
             self.datasets['kddcup99'] = {
-                'X': X,
+                'X': reshaped_X,
                 'y': y,
                 'feature_names': feature_names,
                 'measurement_names': measurement_names,
                 'target_names': target_names,
-                'description': 'KDD Cup 99 dataset reshaped to 5x8 matrices (dropped one feature)'
+                'description': f'KDD Cup 99 dataset adaptive smart reshaping with automatic strategy selection - Best strategy: {best_strategy}',
+                'reshaping_method': 'adaptive_smart_reshape',
+                'selected_strategy': best_strategy,
+                'evaluation_metrics': evaluation_metrics
             }
             
-            print(f"KDD Cup 99 dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
+            print(f"KDD Cup 99 dataset loaded: {reshaped_X.shape[0]} samples of shape {reshaped_X.shape[1]}x{reshaped_X.shape[2]}")
             return self.datasets['kddcup99']
             
         except Exception as e:
