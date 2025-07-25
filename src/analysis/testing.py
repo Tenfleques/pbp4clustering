@@ -3,7 +3,7 @@
 Test Script for Pseudo-Boolean Polynomial Dimensionality Reduction
 
 This script tests all datasets with the pbp_vector approach, including visualization 
-and clustering analysis for all 10 datasets.
+and clustering analysis. Now includes aggregation function optimization.
 """
 
 import numpy as np
@@ -17,6 +17,8 @@ import os
 import sys
 import json
 import logging
+from tqdm import tqdm
+import argparse
 logging.getLogger('matplotlib.font_manager').disabled = True
 
 # Import PBP modules
@@ -28,17 +30,35 @@ except ImportError:
     pbp_vector = None
     PBP_AVAILABLE = False
 
+# Import aggregation optimization
+try:
+    from .aggregation_optimization import AggregationOptimizer
+    from ..pbp.aggregation_functions import get_aggregation_function, get_recommended_aggregation_functions
+    AGGREGATION_OPTIMIZATION_AVAILABLE = True
+except ImportError:
+    print("Warning: Aggregation optimization not available. Using default sum aggregation.")
+    AGGREGATION_OPTIMIZATION_AVAILABLE = False
+
 # Import the centralized DatasetTransformer
 from ..data.loader import DatasetTransformer
 
 class DatasetTester:
     """Test datasets with pbp_vector approach."""
     
-    def __init__(self, data_dir='./data', results_dir='./results'):
+    def __init__(self, data_dir='./data', results_dir='./results', use_optimized_aggregation=True):
         self.data_dir = data_dir
         self.results_dir = results_dir
         self.results = {}
         self.transformer = DatasetTransformer()
+        self.use_optimized_aggregation = use_optimized_aggregation and AGGREGATION_OPTIMIZATION_AVAILABLE
+        self.aggregation_optimizer = None
+        self.optimal_aggregation_functions = {}
+        
+        if self.use_optimized_aggregation:
+            print("✓ Aggregation function optimization enabled")
+            self.aggregation_optimizer = AggregationOptimizer(random_state=42)
+        else:
+            print("⚠ Using default sum aggregation")
         
     def load_dataset(self, dataset_name):
         """Load dataset using the centralized DatasetTransformer."""
@@ -61,26 +81,106 @@ class DatasetTester:
             }
         }
     
-    def apply_pbp_reduction(self, X):
-        """Apply pbp_vector reduction to dataset."""
+    def get_optimal_aggregation_function(self, dataset_name, dataset):
+        """Get the optimal aggregation function for a dataset."""
+        if not self.use_optimized_aggregation:
+            return lambda x: x.sum()
+        
+        # Check if we already have the optimal function cached
+        if dataset_name in self.optimal_aggregation_functions:
+            agg_func_name = self.optimal_aggregation_functions[dataset_name]
+            return get_aggregation_function(agg_func_name)
+        
+        # Check if we have cached optimization results
+        cache_file = os.path.join(self.data_dir, f'{dataset_name}_optimal_aggregation.json')
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                    if 'best_function' in cache_data:
+                        agg_func_name = cache_data['best_function']
+                        self.optimal_aggregation_functions[dataset_name] = agg_func_name
+                        print(f"  Using cached optimal aggregation: {agg_func_name}")
+                        return get_aggregation_function(agg_func_name)
+            except Exception as e:
+                print(f"  Error loading cached aggregation function: {e}")
+        
+        # Run optimization if not cached
+        print(f"  Optimizing aggregation function for {dataset_name}...")
+        try:
+            result = self.aggregation_optimizer.optimize_dataset(dataset, dataset_name)
+            
+            if result and result['success']:
+                agg_func_name = result['best_function']
+                self.optimal_aggregation_functions[dataset_name] = agg_func_name
+                
+                # Cache the result
+                try:
+                    cache_data = {
+                        'best_function': agg_func_name,
+                        'best_metrics': result['best_metrics'],
+                        'best_combined_score': result['best_combined_score']
+                    }
+                    with open(cache_file, 'w') as f:
+                        json.dump(cache_data, f, indent=2)
+                except Exception as e:
+                    print(f"  Warning: Could not cache aggregation result: {e}")
+                
+                print(f"  Optimal aggregation function: {agg_func_name}")
+                return get_aggregation_function(agg_func_name)
+            else:
+                print(f"  Optimization failed, using default sum aggregation")
+                return lambda x: x.sum()
+                
+        except Exception as e:
+            print(f"  Error in aggregation optimization: {e}")
+            return lambda x: x.sum()
+    
+    def apply_pbp_reduction(self, X, dataset_name, dataset):
+        """Apply pbp_vector reduction to dataset with optimal aggregation function."""
         if not PBP_AVAILABLE:
             print("PBP module not available. Using PCA as fallback.")
             X_reduced, method_label = self.apply_pca_reduction(X)
             return X_reduced, method_label
         
-        print("Applying actual PBP vector reduction...")
+        # Get optimal aggregation function
+        agg_func = self.get_optimal_aggregation_function(dataset_name, dataset)
+        agg_func_name = self.optimal_aggregation_functions.get(dataset_name, 'sum')
+        
+        print(f"Applying PBP vector reduction with {agg_func_name} aggregation...")
         reduced_samples = []
         
-        for i in range(X.shape[0]):
+        # Check for cached PBP features
+        cache_file = os.path.join(self.data_dir, f'{dataset_name}_pbp_features_{agg_func_name}.npy')
+        if os.path.exists(cache_file):
+            print(f"  Loading cached PBP features with {agg_func_name} aggregation...")
+            reduced_samples = np.load(cache_file)
+        else:
+            print(f"  Computing PBP features with {agg_func_name} aggregation...")
+            for i in tqdm(range(X.shape[0])):
+                try:
+                    pbp_result = pbp_vector(X[i], agg_func)
+                    reduced_samples.append(pbp_result)
+                except Exception as e:
+                    print(f"Error processing sample {i}: {e}")
+                    # Use original sample if reduction fails
+                    reduced_samples.append(X[i].flatten())
+            
+            reduced_samples = np.array(reduced_samples)
+            
+            # Save to cache
             try:
-                pbp_result = pbp_vector(X[i])
-                reduced_samples.append(pbp_result)
+                np.save(cache_file, reduced_samples)
+                print(f"  Saved PBP features to cache: {cache_file}")
             except Exception as e:
-                print(f"Error processing sample {i}: {e}")
-                # Use original sample if reduction fails
-                reduced_samples.append(X[i].flatten())
+                print(f"  Warning: Could not cache PBP features: {e}")
         
-        return np.array(reduced_samples), "PBP"
+        # Remove zero columns
+        zero_columns = np.all(reduced_samples == 0, axis=0)
+        print(f"Has zero columns: {np.sum(zero_columns)} / {reduced_samples.shape[1]}")
+        reduced_samples = reduced_samples[:, ~zero_columns]
+
+        return reduced_samples, f"PBP ({agg_func_name})"
     
     def apply_pca_reduction(self, X, n_components=3):
         """Apply PCA reduction as fallback."""
@@ -110,7 +210,7 @@ class DatasetTester:
             'silhouette_score': silhouette,
             'davies_bouldin_score': davies_bouldin,
             'y_pred': y_pred,
-            'n_clusters': n_clusters
+            'cluster_centers': kmeans.cluster_centers_
         }
     
     def visualize_results(self, X_reduced, y_true, y_pred, dataset_name, metadata, method_label="PBP"):
@@ -118,71 +218,65 @@ class DatasetTester:
         # Ensure y_true and y_pred are numeric and the same length as X_reduced
         y_true = np.asarray(y_true)
         y_pred = np.asarray(y_pred)
-        
-        # Convert string labels to numeric
         if y_true.dtype == object or y_true.dtype.type is np.str_:
             y_true = pd.Categorical(y_true).codes
         if y_pred.dtype == object or y_pred.dtype.type is np.str_:
             y_pred = pd.Categorical(y_pred).codes
-            
-        # Ensure arrays match the reduced data size
         if len(y_true) != X_reduced.shape[0]:
-            print(f"Warning: y_true length ({len(y_true)}) doesn't match X_reduced ({X_reduced.shape[0]}). Skipping visualization.")
+            print(f"Skipping visualization for {dataset_name}: y_true length mismatch.")
             return
         if len(y_pred) != X_reduced.shape[0]:
-            print(f"Warning: y_pred length ({len(y_pred)}) doesn't match X_reduced ({X_reduced.shape[0]}). Skipping visualization.")
+            print(f"Skipping visualization for {dataset_name}: y_pred length mismatch.")
             return
-        
-        # Create results directory if it doesn't exist
-        os.makedirs(f"{self.results_dir}/figures", exist_ok=True)
-        
-        # Create figure with subplots
+
         fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-        
-        # Plot 1: True labels
         scatter1 = axes[0].scatter(X_reduced[:, 0], X_reduced[:, 1], c=y_true, cmap='viridis', alpha=0.7)
-        axes[0].set_title(f'{dataset_name} - True Labels ({method_label})')
+        axes[0].set_title(f'{dataset_name} - True Labels\n({method_label})')
         axes[0].set_xlabel('Component 1')
         axes[0].set_ylabel('Component 2')
         plt.colorbar(scatter1, ax=axes[0])
-        
-        # Plot 2: Predicted labels
+
         scatter2 = axes[1].scatter(X_reduced[:, 0], X_reduced[:, 1], c=y_pred, cmap='viridis', alpha=0.7)
-        axes[1].set_title(f'{dataset_name} - Predicted Labels ({method_label})')
+        axes[1].set_title(f'{dataset_name} - Predicted Clusters\n({method_label})')
         axes[1].set_xlabel('Component 1')
         axes[1].set_ylabel('Component 2')
         plt.colorbar(scatter2, ax=axes[1])
-        
-        # Add 3D plot if we have 3 components
-        if X_reduced.shape[1] >= 3:
-            fig_3d = plt.figure(figsize=(10, 8))
-            ax_3d = fig_3d.add_subplot(111, projection='3d')
-            scatter_3d = ax_3d.scatter(X_reduced[:, 0], X_reduced[:, 1], X_reduced[:, 2], 
-                                      c=y_pred, cmap='viridis', alpha=0.7)
-            ax_3d.set_title(f'{dataset_name} - 3D Clustering ({method_label})')
-            ax_3d.set_xlabel('Component 1')
-            ax_3d.set_ylabel('Component 2')
-            ax_3d.set_zlabel('Component 3')
-            plt.colorbar(scatter_3d, ax=ax_3d)
-            
-            # Save 3D plot
-            plt.savefig(f"{self.results_dir}/figures/{dataset_name}_clustering_3d.png", dpi=300, bbox_inches='tight')
-            plt.close(fig_3d)
-        
-        # Save 2D plots
+
         plt.tight_layout()
-        plt.savefig(f"{self.results_dir}/figures/{dataset_name}_clustering_{method_label}.png", dpi=300, bbox_inches='tight')
-        plt.close(fig)
+        plt.savefig(f"{self.results_dir}/figures/{dataset_name}_clustering_{method_label.replace(' ', '_')}.png", dpi=300, bbox_inches='tight')
+        # plt.show()
         
-        print(f"Visualization saved: {dataset_name}_clustering_{method_label}.png")
+        # 3D visualization if we have 3+ components
+        if X_reduced.shape[1] >= 3:
+            fig = plt.figure(figsize=(15, 6))
+            
+            ax1 = fig.add_subplot(121, projection='3d')
+            scatter1 = ax1.scatter(X_reduced[:, 0], X_reduced[:, 1], X_reduced[:, 2], 
+                                  c=y_true, cmap='viridis', alpha=0.7)
+            ax1.set_title(f'{dataset_name} - True Labels (3D)')
+            ax1.set_xlabel('Component 1')
+            ax1.set_ylabel('Component 2')
+            ax1.set_zlabel('Component 3')
+            
+            ax2 = fig.add_subplot(122, projection='3d')
+            scatter2 = ax2.scatter(X_reduced[:, 0], X_reduced[:, 1], X_reduced[:, 2], 
+                                  c=y_pred, cmap='viridis', alpha=0.7)
+            ax2.set_title(f'{dataset_name} - Predicted Clusters (3D)')
+            ax2.set_xlabel('Component 1')
+            ax2.set_ylabel('Component 2')
+            ax2.set_zlabel('Component 3')
+            
+            plt.tight_layout()
+            plt.savefig(f"{self.results_dir}/figures/{dataset_name}_clustering_3d_{method_label.replace(' ', '_')}.png", dpi=300, bbox_inches='tight')
+            # plt.show()
     
     def test_dataset(self, dataset_name):
-        """Test a single dataset with PBP approach."""
-        print(f"\n{'='*60}")
-        print(f"Testing {dataset_name} dataset")
-        print(f"{'='*60}")
+        """Test a specific dataset with the pbp_vector approach."""
+        print(f"\n{'='*50}")
+        print(f"Testing dataset: {dataset_name}")
+        print(f"{'='*50}")
         
-        # Load dataset
+        # Load dataset using the centralized DatasetTransformer
         dataset = self.load_dataset(dataset_name)
         if dataset is None:
             return None
@@ -191,130 +285,172 @@ class DatasetTester:
         y = dataset['y']
         metadata = dataset['metadata']
         
-        print(f"Dataset shape: {X.shape}")
+        print(f"Original shape: {X.shape}")
         print(f"Number of classes: {len(np.unique(y))}")
+        print(f"Feature names: {metadata['feature_names']}")
+        print(f"Measurement names: {metadata['measurement_names']}")
         
-        # Apply PBP reduction
-        X_reduced, method_label = self.apply_pbp_reduction(X)
+        # Apply pbp_vector reduction with optimal aggregation
+        print("\nApplying pbp_vector reduction...")
+        X_reduced, method_label = self.apply_pbp_reduction(X, dataset_name, dataset)
+        
         print(f"Reduced shape: {X_reduced.shape}")
+        print(f"Dimensionality reduction: {X.shape[1] * X.shape[2]} -> {X_reduced.shape[1]}")
         
         # Evaluate clustering
-        evaluation = self.evaluate_clustering(X_reduced, y)
+        print("\nEvaluating clustering performance...")
+        clustering_results = self.evaluate_clustering(X_reduced, y)
         
-        print(f"Clustering Results:")
-        print(f"  Silhouette Score: {evaluation['silhouette_score']:.4f}")
-        print(f"  Davies-Bouldin Score: {evaluation['davies_bouldin_score']:.4f}")
-        print(f"  Number of clusters: {evaluation['n_clusters']}")
+        print(f"Silhouette Score: {clustering_results['silhouette_score']:.4f}")
+        print(f"Davies-Bouldin Score: {clustering_results['davies_bouldin_score']:.4f}")
+        
+        # Get aggregation function info
+        agg_func_name = self.optimal_aggregation_functions.get(dataset_name, 'sum')
         
         # Visualize results
-        self.visualize_results(X_reduced, y, evaluation['y_pred'], dataset_name, metadata, method_label)
+        print("\nGenerating visualizations...")
+        # self.visualize_results(X_reduced, y, clustering_results['y_pred'], 
+                            #  dataset_name, metadata, method_label=method_label)
         
         # Store results
         self.results[dataset_name] = {
-            'X_reduced': X_reduced,
-            'y_true': y,
-            'y_pred': evaluation['y_pred'],
-            'evaluation': evaluation,
-            'method': method_label,
-            'metadata': metadata
+            'original_shape': X.shape,
+            'reduced_shape': X_reduced.shape,
+            'clustering_results': clustering_results,
+            'metadata': metadata,
+            'aggregation_function': agg_func_name,
+            'method_label': method_label
         }
         
         return self.results[dataset_name]
     
     def test_all_datasets(self):
         """Test all available datasets."""
-        print("Testing all datasets with PBP approach...")
+        # Get all available datasets from the consolidated loader
+        try:
+            from ..data.consolidated_loader import ConsolidatedDatasetLoader
+            loader = ConsolidatedDatasetLoader()
+            dataset_config = loader.get_available_datasets()
+            
+            # Flatten all datasets into a single list
+            all_datasets = []
+            for category, datasets in dataset_config.items():
+                all_datasets.extend(datasets)
+            
+            print(f"Found {len(all_datasets)} datasets across {len(dataset_config)} categories")
+            print("Testing all available datasets...")
+            
+        except Exception as e:
+            print(f"Error getting dataset configuration: {e}")
+            # Fallback to a subset of datasets
+            all_datasets = [
+                'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
+                'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
+                'seeds', 'thyroid', 'pima', 'ionosphere', 'spectf',
+                'glass_conforming', 'covertype', 'kddcup99', 'linnerrud', 'species_distribution'
+            ]
+            print(f"Using fallback dataset list: {len(all_datasets)} datasets")
         
-        # List of datasets to test
-        datasets = [
-            'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
-            'sonar', 'glass', 'vehicle', 'ecoli', 'yeast'
-        ]
+        results = {}
         
-        
-        successful_tests = 0
-        
-        for dataset_name in datasets:
+        for dataset_name in tqdm(all_datasets, desc="Testing datasets"):
             try:
                 result = self.test_dataset(dataset_name)
                 if result:
-                    successful_tests += 1
+                    results[dataset_name] = result
             except Exception as e:
                 print(f"Error testing {dataset_name}: {e}")
         
-        print(f"\n{'='*60}")
-        print(f"Testing completed: {successful_tests}/{len(datasets)} datasets successful")
-        print(f"{'='*60}")
-        
         # Generate summary report
-        self.generate_summary_report(self.results)
+        self.generate_summary_report(results)
         
-        return self.results
+        return results
     
     def generate_summary_report(self, results):
         """Generate a summary report of all test results."""
         print(f"\n{'='*80}")
-        print("PBP TESTING SUMMARY REPORT")
+        print("SUMMARY REPORT - PBP Vector Approach with Aggregation Optimization")
         print(f"{'='*80}")
         
         if not results:
-            print("No results to summarize.")
+            print("No results available for summary report.")
             return
         
-        # Create summary DataFrame
+        # Create summary table
         summary_data = []
-        
-        for dataset_name, result in results.items():
-            evaluation = result['evaluation']
+        for name, result in results.items():
             summary_data.append({
-                'Dataset': dataset_name,
-                'Method': result['method'],
-                'Silhouette_Score': evaluation['silhouette_score'],
-                'Davies_Bouldin_Score': evaluation['davies_bouldin_score'],
-                'N_Clusters': evaluation['n_clusters'],
-                'Original_Shape': result['X_reduced'].shape,
-                'N_Samples': result['X_reduced'].shape[0]
+                'Dataset': name,
+                'Original Shape': f"{result['original_shape'][1]}x{result['original_shape'][2]}",
+                'Reduced Shape': f"{result['reduced_shape'][1]}",
+                'Aggregation Function': result.get('aggregation_function', 'sum'),
+                'Silhouette Score': f"{result['clustering_results']['silhouette_score']:.4f}",
+                'Davies-Bouldin Score': f"{result['clustering_results']['davies_bouldin_score']:.4f}",
+                'Description': result['metadata']['description']
             })
         
         summary_df = pd.DataFrame(summary_data)
+        print(summary_df.to_string(index=False))
         
-        # Save summary to CSV
-        output_file = f"{self.results_dir}/tables/test_summary_pbp_vector.csv"
-        summary_df.to_csv(output_file, index=False)
-        print(f"Summary saved to: {output_file}")
+        # Save summary to file
+        summary_df.to_csv(f"{self.results_dir}/tables/test_summary_pbp_vector_optimized.csv", index=False)
+        print(f"\nSummary saved to {self.results_dir}/tables/test_summary_pbp_vector_optimized.csv")
         
-        # Print summary statistics
-        print("\nSummary Statistics:")
-        print("-" * 50)
+        # Find best performing datasets
+        best_silhouette = max(results.items(), 
+                             key=lambda x: x[1]['clustering_results']['silhouette_score'])
+        best_davies = min(results.items(), 
+                         key=lambda x: x[1]['clustering_results']['davies_bouldin_score'])
         
-        print(f"Total datasets tested: {len(results)}")
-        print(f"Average Silhouette Score: {summary_df['Silhouette_Score'].mean():.4f}")
-        print(f"Average Davies-Bouldin Score: {summary_df['Davies_Bouldin_Score'].mean():.4f}")
+        print(f"\nBest Silhouette Score: {best_silhouette[0]} ({best_silhouette[1]['clustering_results']['silhouette_score']:.4f})")
+        print(f"Best Davies-Bouldin Score: {best_davies[0]} ({best_davies[1]['clustering_results']['davies_bouldin_score']:.4f})")
         
-        # Best performing dataset
-        best_dataset = summary_df.loc[summary_df['Silhouette_Score'].idxmax()]
-        print(f"\nBest performing dataset: {best_dataset['Dataset']}")
-        print(f"  Silhouette Score: {best_dataset['Silhouette_Score']:.4f}")
-        print(f"  Davies-Bouldin Score: {best_dataset['Davies_Bouldin_Score']:.4f}")
+        # Performance statistics
+        silhouette_scores = [r['clustering_results']['silhouette_score'] for r in results.values()]
+        davies_scores = [r['clustering_results']['davies_bouldin_score'] for r in results.values()]
         
-        # Dataset rankings
-        print("\nDataset rankings (by Silhouette Score):")
-        rankings = summary_df.sort_values('Silhouette_Score', ascending=False)
-        for _, row in rankings.iterrows():
-            print(f"  {row['Dataset']}: {row['Silhouette_Score']:.4f}")
+        print(f"\nPerformance Statistics:")
+        print(f"Average Silhouette Score: {np.mean(silhouette_scores):.4f} ± {np.std(silhouette_scores):.4f}")
+        print(f"Average Davies-Bouldin Score: {np.mean(davies_scores):.4f} ± {np.std(davies_scores):.4f}")
+        
+        # Aggregation function usage statistics
+        if self.use_optimized_aggregation:
+            agg_func_counts = {}
+            for result in results.values():
+                agg_func = result.get('aggregation_function', 'sum')
+                agg_func_counts[agg_func] = agg_func_counts.get(agg_func, 0) + 1
+            
+            print(f"\nAggregation Function Usage:")
+            for agg_func, count in sorted(agg_func_counts.items(), key=lambda x: x[1], reverse=True):
+                print(f"  {agg_func}: {count} datasets")
 
 
 def main():
     """Main function to run dataset testing."""
-    tester = DatasetTester('./data')
-    results = tester.test_all_datasets()
+    # Create data directory if it doesn't exist
+    data_dir = './data'
+    results_dir = './results'
+    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(results_dir, exist_ok=True)
+    os.makedirs(f"{results_dir}/figures", exist_ok=True)
+    os.makedirs(f"{results_dir}/tables", exist_ok=True)
     
-    if results:
-        print(f"\n✅ Dataset testing completed successfully!")
-        print(f"Results for {len(results)} datasets generated.")
-    else:
-        print(f"\n❌ Dataset testing failed or no results generated.")
+    # Initialize tester
+    tester = DatasetTester(data_dir, results_dir)
+    
+    parser = argparse.ArgumentParser(description="Test datasets with PBP vector approach")
+    parser.add_argument("-d", "--dataset_name", default='all', help="Name of the dataset to test")
+    args = parser.parse_args()
 
+    # Test all datasets
+    if args.dataset_name == 'all':
+        results = tester.test_all_datasets()
+    else:
+        results = tester.test_dataset(args.dataset_name)
+        exit()
+    
+    print(f"\nTesting completed! Results for {len(results)} datasets.")
+    print(f"Check {results_dir} for saved visualizations and summary.")
 
 if __name__ == "__main__":
     main() 

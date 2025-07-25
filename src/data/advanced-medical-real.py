@@ -679,8 +679,8 @@ class RealMedicalDataLoader:
             y_file = self.data_dir / f"{dataset_name}_y.npy"
             metadata_file = self.data_dir / f"{dataset_name}_metadata.json"
             
-            X = np.load(x_file)
-            y = np.load(y_file)
+            X = np.load(x_file, allow_pickle=True)
+            y = np.load(y_file, allow_pickle=True)
             
             with open(metadata_file, 'r') as f:
                 metadata = json.load(f)

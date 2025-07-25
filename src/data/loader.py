@@ -816,8 +816,8 @@ class DatasetTransformer:
         if use_transformed:
             # Try to load transformed digits first
             try:
-                X = np.load('./data/digits_transformed_X.npy')
-                y = np.load('./data/digits_transformed_y.npy')
+                X = np.load('./data/digits_transformed_X.npy', allow_pickle=True)
+                y = np.load('./data/digits_transformed_y.npy', allow_pickle=True)
                 
                 try:
                     with open('./data/digits_transformed_metadata.json', 'r') as f:
@@ -920,7 +920,6 @@ class DatasetTransformer:
             'glass_conforming': self.load_glass_conforming_dataset,
             # New datasets from suitability analysis
             'covertype': self.load_covertype_dataset,
-            'olivetti_faces': self.load_olivetti_faces_dataset,
             'kddcup99': self.load_kddcup99_dataset,
             'linnerrud': self.load_linnerrud_dataset,
             'species_distribution': self.load_species_distribution_dataset
@@ -1620,45 +1619,6 @@ class DatasetTransformer:
             print(f"Error loading Covertype dataset: {e}")
             return None
 
-    def load_olivetti_faces_dataset(self):
-        """Load and transform Olivetti faces dataset into 64x64 matrices."""
-        print("Loading Olivetti faces dataset...")
-        
-        try:
-            from sklearn.datasets import fetch_olivetti_faces
-            
-            olivetti = fetch_olivetti_faces()
-            X = olivetti.data  # (400, 4096)
-            y = olivetti.target  # (400,)
-            
-            print(f"Original Olivetti shape: {X.shape}")
-            
-            # Reshape to 64x64 matrices (4096 = 64*64)
-            # This preserves the spatial structure of the face images
-            X = X.reshape(-1, 64, 64)
-            
-            feature_names = ['Face_Image']
-            measurement_names = [f'Pixel_{i+1}' for i in range(64)]
-            
-            # Target names are person IDs
-            target_names = [f'Person_{i}' for i in range(40)]
-            
-            self.datasets['olivetti_faces'] = {
-                'X': X,
-                'y': y,
-                'feature_names': feature_names,
-                'measurement_names': measurement_names,
-                'target_names': target_names,
-                'description': 'Olivetti faces dataset reshaped to 64x64 matrices'
-            }
-            
-            print(f"Olivetti faces dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
-            return self.datasets['olivetti_faces']
-            
-        except Exception as e:
-            print(f"Error loading Olivetti faces dataset: {e}")
-            return None
-
     def load_kddcup99_dataset(self):
         """Load and transform KDD Cup 99 dataset using adaptive smart reshaping with maximum 3 rows."""
         print("Loading KDD Cup 99 dataset...")
@@ -1787,7 +1747,7 @@ class DatasetTransformer:
         except Exception as e:
             print(f"Error loading Species distribution dataset: {e}")
             return None
-
+    
     def normalize_dataset(self, dataset_name, method='standard'):
         """Normalize a dataset using specified method."""
         if dataset_name not in self.datasets:
@@ -1908,7 +1868,6 @@ class DatasetTransformer:
             'glass_conforming',
             # New datasets from suitability analysis
             'covertype',
-            '# olivetti_faces',
             'kddcup99',
             'linnerrud',
             'species_distribution'

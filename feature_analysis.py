@@ -20,6 +20,7 @@ from typing import Dict, List, Tuple, Any
 import json
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import glob
 
 def load_dataset_data(dataset_name: str, data_dir: str = "data") -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -40,7 +41,11 @@ def load_dataset_data(dataset_name: str, data_dir: str = "data") -> Tuple[np.nda
     #                    f"Valid datasets are: {valid_datasets}. "
     #                    f"Other datasets don't have natural combinatorial relationships.")
     
-    features_path = os.path.join(data_dir, f"{dataset_name}_pbp_features.npy")
+    possible_paths = glob.glob(os.path.join(data_dir, f"{dataset_name}_pbp_features*"))
+    if len(possible_paths) == 0:
+        raise FileNotFoundError(f"Features file not found: {possible_paths}")
+    
+    features_path = possible_paths[0]
     targets_path = os.path.join(data_dir, f"{dataset_name}_y.npy")
     
     if not os.path.exists(features_path):
@@ -467,7 +472,12 @@ def analyze_features(dataset_name: str, top_k: int = 10, data_dir: str = "data")
         Dictionary containing all analysis results
     """
     print(f"Loading data for dataset: {dataset_name}")
-    data_result = load_dataset_data(dataset_name, data_dir)
+    try:
+        data_result = load_dataset_data(dataset_name, data_dir)
+    except Exception as e:
+        print(f"Error loading data for dataset: {dataset_name}")
+        print(e)
+        return None
     
     if data_result is None:
         print(f"Skipping {dataset_name} due to data loading issues.")
@@ -799,7 +809,7 @@ def main():
         if args.dataset_name == 'all':
             datasets = ['iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
                         'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
-                        'seeds', 'thyroid', 'pima', 'ionosphere', 'glass_conforming']
+                        'seeds', 'thyroid', 'pima', 'ionosphere']
             for dataset in datasets:
                 print(f"Analyzing dataset: {dataset}")
                 analyze_dataset(dataset, args)

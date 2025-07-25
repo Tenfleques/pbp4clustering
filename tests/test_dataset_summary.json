@@ -1,0 +1,428 @@
+{
+  "total_datasets": 31,
+  "categories": [
+    "standard",
+    "uci",
+    "large",
+    "advanced_aids",
+    "advanced_genetic",
+    "advanced_medical",
+    "advanced_nci"
+  ],
+  "datasets_by_category": {
+    "standard": [
+      "iris",
+      "breast_cancer",
+      "wine",
+      "digits",
+      "diabetes"
+    ],
+    "uci": [
+      "sonar",
+      "glass",
+      "vehicle",
+      "ecoli",
+      "yeast",
+      "seeds",
+      "thyroid",
+      "pima",
+      "ionosphere",
+      "spectf"
+    ],
+    "large": [
+      "covertype",
+      "kddcup99",
+      "olivetti_faces",
+      "linnerrud",
+      "species_distribution"
+    ],
+    "advanced_aids": [
+      "aids_screen"
+    ],
+    "advanced_genetic": [
+      "geo_breast_cancer",
+      "1000_genomes_snp",
+      "ebi_expression"
+    ],
+    "advanced_medical": [
+      "gdsc_expression",
+      "metabolights",
+      "physionet",
+      "mimic_demo",
+      "drug_response",
+      "imaging_features"
+    ],
+    "advanced_nci": [
+      "nci_chemical"
+    ]
+  },
+  "dataset_info": {
+    "iris": {
+      "name": "iris",
+      "shape": [
+        150,
+        2,
+        3
+      ],
+      "n_classes": 3,
+      "data_type": "standard_sklearn",
+      "description": "iris dataset from sklearn",
+      "source": "sklearn",
+      "reshaping_strategy": "homogeneity_only"
+    },
+    "breast_cancer": {
+      "name": "breast_cancer",
+      "shape": [
+        569,
+        2,
+        20
+      ],
+      "n_classes": 2,
+      "data_type": "standard_sklearn",
+      "description": "breast_cancer dataset from sklearn",
+      "source": "sklearn",
+      "reshaping_strategy": "homogeneity_only"
+    },
+    "wine": {
+      "name": "wine",
+      "shape": [
+        178,
+        2,
+        7
+      ],
+      "n_classes": 3,
+      "data_type": "standard_sklearn",
+      "description": "wine dataset from sklearn",
+      "source": "sklearn",
+      "reshaping_strategy": "fallback"
+    },
+    "digits": {
+      "name": "digits",
+      "shape": [
+        1797,
+        2,
+        32
+      ],
+      "n_classes": 10,
+      "data_type": "standard_sklearn",
+      "description": "digits dataset from sklearn",
+      "source": "sklearn",
+      "reshaping_strategy": "fallback"
+    },
+    "diabetes": {
+      "name": "diabetes",
+      "shape": [
+        442,
+        2,
+        5
+      ],
+      "n_classes": 3,
+      "data_type": "standard_sklearn",
+      "description": "diabetes dataset from sklearn",
+      "source": "sklearn",
+      "reshaping_strategy": "importance_focused"
+    },
+    "sonar": {
+      "name": "sonar",
+      "shape": [
+        208,
+        4,
+        15
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "glass": {
+      "name": "glass",
+      "shape": [
+        426,
+        3,
+        3
+      ],
+      "n_classes": 6,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "vehicle": {
+      "name": "vehicle",
+      "shape": [
+        376,
+        4,
+        9
+      ],
+      "n_classes": 4,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "ecoli": {
+      "name": "ecoli",
+      "shape": [
+        336,
+        2,
+        7
+      ],
+      "n_classes": 8,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "yeast": {
+      "name": "yeast",
+      "shape": [
+        1484,
+        3,
+        8
+      ],
+      "n_classes": 10,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "seeds": {
+      "name": "seeds",
+      "shape": [
+        199,
+        7,
+        1
+      ],
+      "n_classes": 3,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "thyroid": {
+      "name": "thyroid",
+      "shape": [
+        215,
+        6,
+        1
+      ],
+      "n_classes": 3,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "pima": {
+      "name": "pima",
+      "shape": [
+        768,
+        4,
+        2
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "ionosphere": {
+      "name": "ionosphere",
+      "shape": [
+        351,
+        17,
+        2
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "spectf": {
+      "name": "spectf",
+      "shape": [
+        80,
+        22,
+        1
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "covertype": {
+      "name": "covertype",
+      "shape": [
+        581012,
+        3,
+        18
+      ],
+      "n_classes": 7,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "kddcup99": null,
+    "olivetti_faces": {
+      "name": "olivetti_faces",
+      "shape": [
+        400,
+        3,
+        1366
+      ],
+      "n_classes": 40,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "linnerrud": {
+      "name": "linnerrud",
+      "shape": [
+        20,
+        2,
+        2
+      ],
+      "n_classes": 3,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "species_distribution": {
+      "name": "species_distribution",
+      "shape": [
+        1000,
+        3,
+        9
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "aids_screen": {
+      "name": "aids_screen",
+      "shape": [
+        49556,
+        2,
+        4
+      ],
+      "n_classes": 3,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "geo_breast_cancer": {
+      "name": "geo_breast_cancer",
+      "shape": [
+        508,
+        4,
+        8
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "1000_genomes_snp": {
+      "name": "1000_genomes_snp",
+      "shape": [
+        2504,
+        4,
+        8
+      ],
+      "n_classes": 26,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "ebi_expression": null,
+    "gdsc_expression": {
+      "name": "gdsc_expression",
+      "shape": [
+        811,
+        5,
+        8
+      ],
+      "n_classes": 807,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "metabolights": {
+      "name": "metabolights",
+      "shape": [
+        132,
+        4,
+        4
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "physionet": {
+      "name": "physionet",
+      "shape": [
+        1000,
+        4,
+        5
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "mimic_demo": null,
+    "drug_response": {
+      "name": "drug_response",
+      "shape": [
+        500,
+        3,
+        4
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "imaging_features": {
+      "name": "imaging_features",
+      "shape": [
+        300,
+        4,
+        4
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    },
+    "nci_chemical": {
+      "name": "nci_chemical",
+      "shape": [
+        4843,
+        4,
+        8
+      ],
+      "n_classes": 2,
+      "data_type": "unknown",
+      "description": "",
+      "source": "unknown",
+      "reshaping_strategy": "unknown"
+    }
+  }
+}

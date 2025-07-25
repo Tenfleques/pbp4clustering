@@ -1,0 +1,41 @@
+# Dataset Configuration File
+# This file contains all dataset names organized by category
+# Format: category:dataset_name
+
+# Standard sklearn datasets
+standard:iris
+standard:breast_cancer
+standard:wine
+standard:digits
+standard:diabetes
+
+# UCI datasets
+uci:sonar
+uci:glass
+uci:vehicle
+uci:ecoli
+uci:yeast
+uci:seeds
+uci:thyroid
+uci:pima
+uci:ionosphere
+uci:spectf
+
+# Large datasets
+large:covertype
+large:kddcup99
+large:linnerrud
+large:species_distribution
+
+# Advanced real datasets
+advanced_aids:aids_screen
+advanced_genetic:geo_breast_cancer
+advanced_genetic:1000_genomes_snp
+advanced_genetic:ebi_expression
+advanced_medical:gdsc_expression
+advanced_medical:metabolights
+advanced_medical:physionet
+advanced_medical:mimic_demo
+advanced_medical:drug_response
+advanced_medical:imaging_features
+advanced_nci:nci_chemical 

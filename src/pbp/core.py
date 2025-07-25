@@ -4,7 +4,7 @@ import sys
 from bitarray import bitarray, frozenbitarray
 from bitarray.util import ba2int, int2ba
 import pandas as pd
-
+from typing import Callable, Any
 BIT_ORDER="little"
 logging.basicConfig(format='%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG )
 logger = logging.getLogger()
@@ -91,7 +91,7 @@ def create_variable_matrix(C: np.array, perm: np.array):
     return y
 
 # Function to reduce the polynomial
-def reduce_pbp_pandas(coeffs: np.array, variables: np.array):
+def reduce_pbp_pandas(coeffs: np.array, variables: np.array, agg_func: Callable[[pd.Series], Any] = lambda x: x.sum()):
     """
     Reduces a polynomial basis representation using pandas DataFrame operations.
 
@@ -107,7 +107,7 @@ def reduce_pbp_pandas(coeffs: np.array, variables: np.array):
     df = pd.DataFrame()
     df["y"] = var_flat
     df["coeffs"] = coeffs.ravel()
-    df = df.groupby(['y'], as_index=False).agg({'y': 'first', 'coeffs': 'sum' })
+    df = df.groupby(['y'], as_index=False).agg({'y': 'first', 'coeffs': agg_func })
     zero_coeffs = df["coeffs"] == 0
     df = df.loc[~zero_coeffs]
     df["degree"] = df["y"].apply(calculate_degree)
@@ -136,7 +136,7 @@ def decode_var(y, BIT_ORDER=BIT_ORDER):
     return "y" + "y".join([sub_s[i+1] for i in indices])
 
 # Driver function to create a whole pBp
-def create_pbp(c: np.array):
+def create_pbp(c: np.array, agg_func: Callable[[pd.Series], Any] = lambda x: x.sum()):
     """
     Create a polynomial basis representation (pBp) based on the given matrix C.
 
@@ -150,7 +150,7 @@ def create_pbp(c: np.array):
     perm_c = create_perm(c)
     coeffs_c = create_coeffs_matrix(c, perm_c)
     y = create_variable_matrix(c, perm_c)
-    pBp = reduce_pbp_pandas(coeffs_c, y)
+    pBp = reduce_pbp_pandas(coeffs_c, y, agg_func)
     return pBp
 
 # Function to truncate a pBp by a given p value
@@ -208,11 +208,11 @@ def trunc_driver(c, p_list):
         print("=" * 100)
 
 
-def pbp_vector(c: np.array):
+def pbp_vector(c: np.array, agg_func: Callable[[pd.Series], Any] = lambda x: x.sum()):
     """
     Creates a polynomial basis representation (pBp) for a given input matrix C.
     """
-    pBp = create_pbp(c)
+    pBp = create_pbp(c, agg_func)
     vector = np.zeros(2**c.shape[0] - 1, dtype=c.dtype)
     for index, row in pBp.iterrows():
         vector[row["y"]] = row["coeffs"]

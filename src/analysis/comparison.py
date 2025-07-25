@@ -1,89 +1,66 @@
 #!/usr/bin/env python3
 """
-Comprehensive Comparison: PBP vs PCA, t-SNE, UMAP
+Comprehensive Comparison Script
 
 This script compares the pseudo-Boolean polynomial approach with feature selection
 against traditional dimensionality reduction methods (PCA, t-SNE, UMAP).
+Now includes aggregation function optimization for PBP.
 """
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, davies_bouldin_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import umap
 import os
 import sys
 import json
-import warnings
 import logging
 from tqdm import tqdm
+logging.getLogger('matplotlib.font_manager').disabled = True
 
-# Suppress warnings and verbose output
-warnings.filterwarnings('ignore')
-logging.getLogger().setLevel(logging.ERROR)
-
-# Suppress UMAP verbose output
-os.environ['UMAP_VERBOSE'] = '0'
-
-# Import UMAP after setting environment variables
-import umap
-
-# Add colorama for colored terminal output
-try:
-    from colorama import init, Fore, Back, Style
-    init(autoreset=True)
-    COLORS_AVAILABLE = True
-except ImportError:
-    COLORS_AVAILABLE = False
-    # Define dummy color classes if colorama is not available
-    class Fore:
-        GREEN = ""
-        RED = ""
-        YELLOW = ""
-        BLUE = ""
-        MAGENTA = ""
-        CYAN = ""
-        WHITE = ""
-        RESET = ""
-    
-    class Back:
-        GREEN = ""
-        RED = ""
-        YELLOW = ""
-        BLUE = ""
-        MAGENTA = ""
-        CYAN = ""
-        WHITE = ""
-        RESET = ""
-    
-    class Style:
-        BRIGHT = ""
-        DIM = ""
-        NORMAL = ""
-        RESET_ALL = ""
-
-# Import PBP functions
+# Import PBP modules
 try:
     from ..pbp.core import pbp_vector
     from ..data.loader import DatasetTransformer
+    PBP_AVAILABLE = True
 except ImportError:
     print("Warning: pbp modules not found. Using PCA as fallback.")
     pbp_vector = None
+    PBP_AVAILABLE = False
+
+# Import aggregation optimization
+try:
+    from .aggregation_optimization import AggregationOptimizer
+    from ..pbp.aggregation_functions import get_aggregation_function, get_recommended_aggregation_functions
+    AGGREGATION_OPTIMIZATION_AVAILABLE = True
+except ImportError:
+    print("Warning: Aggregation optimization not available. Using default sum aggregation.")
+    AGGREGATION_OPTIMIZATION_AVAILABLE = False
 
 
 class ComprehensiveComparison:
     """Comprehensive comparison of dimensionality reduction methods."""
     
-    def __init__(self, data_dir='./data', results_dir='./results'):
+    def __init__(self, data_dir='./data', results_dir='./results', use_optimized_aggregation=True):
         self.data_dir = data_dir
         self.results_dir = results_dir
         self.results = {}
         self.feature_selection_results = {}
         self.transformer = DatasetTransformer()
+        self.use_optimized_aggregation = use_optimized_aggregation and AGGREGATION_OPTIMIZATION_AVAILABLE
+        self.aggregation_optimizer = None
+        self.optimal_aggregation_functions = {}
+        
+        if self.use_optimized_aggregation:
+            print("✓ Aggregation function optimization enabled for PBP")
+            self.aggregation_optimizer = AggregationOptimizer(random_state=42)
+        else:
+            print("⚠ Using default sum aggregation for PBP")
         
     def load_dataset(self, dataset_name):
         """Load dataset using the centralized DatasetTransformer."""
@@ -106,18 +83,69 @@ class ComprehensiveComparison:
             }
         }
     
+    def get_optimal_aggregation_function(self, dataset_name, dataset):
+        """Get the optimal aggregation function for a dataset."""
+        if not self.use_optimized_aggregation or not PBP_AVAILABLE:
+            return lambda x: x.sum()
+        
+        # Check if we already have the optimal function cached
+        if dataset_name in self.optimal_aggregation_functions:
+            agg_func_name = self.optimal_aggregation_functions[dataset_name]
+            return get_aggregation_function(agg_func_name)
+        
+        # Check if we have cached optimization results
+        cache_file = os.path.join(self.data_dir, f'{dataset_name}_optimal_aggregation.json')
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                    if 'best_function' in cache_data:
+                        agg_func_name = cache_data['best_function']
+                        self.optimal_aggregation_functions[dataset_name] = agg_func_name
+                        print(f"  Using cached optimal aggregation: {agg_func_name}")
+                        return get_aggregation_function(agg_func_name)
+            except Exception as e:
+                print(f"  Error loading cached aggregation function: {e}")
+        
+        # Run optimization if not cached
+        print(f"  Optimizing aggregation function for {dataset_name}...")
+        try:
+            result = self.aggregation_optimizer.optimize_dataset(dataset, dataset_name)
+            
+            if result and result['success']:
+                agg_func_name = result['best_function']
+                self.optimal_aggregation_functions[dataset_name] = agg_func_name
+                
+                # Cache the result
+                try:
+                    cache_data = {
+                        'best_function': agg_func_name,
+                        'best_metrics': result['best_metrics'],
+                        'best_combined_score': result['best_combined_score']
+                    }
+                    with open(cache_file, 'w') as f:
+                        json.dump(cache_data, f, indent=2)
+                except Exception as e:
+                    print(f"  Warning: Could not cache aggregation result: {e}")
+                
+                print(f"  Optimal aggregation function: {agg_func_name}")
+                return get_aggregation_function(agg_func_name)
+            else:
+                print(f"  Optimization failed, using default sum aggregation")
+                return lambda x: x.sum()
+                
+        except Exception as e:
+            print(f"  Error in aggregation optimization: {e}")
+            return lambda x: x.sum()
+    
     def apply_pca(self, X, n_components=3):
         """Apply PCA dimensionality reduction."""
         # Flatten matrices for PCA
         X_flat = X.reshape(X.shape[0], -1)
         
-        # Standardize the data
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X_flat)
-        
         # Apply PCA
-        pca = PCA(n_components=min(n_components, X_scaled.shape[1]))
-        X_reduced = pca.fit_transform(X_scaled)
+        pca = PCA(n_components=min(n_components, X_flat.shape[1]))
+        X_reduced = pca.fit_transform(X_flat)
         
         return X_reduced, "PCA"
     
@@ -126,13 +154,9 @@ class ComprehensiveComparison:
         # Flatten matrices for t-SNE
         X_flat = X.reshape(X.shape[0], -1)
         
-        # Standardize the data
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X_flat)
-        
         # Apply t-SNE
-        tsne = TSNE(n_components=n_components, random_state=42, perplexity=min(30, X_scaled.shape[0]-1))
-        X_reduced = tsne.fit_transform(X_scaled)
+        tsne = TSNE(n_components=min(n_components, X_flat.shape[1]), random_state=42)
+        X_reduced = tsne.fit_transform(X_flat)
         
         return X_reduced, "t-SNE"
     
@@ -141,23 +165,23 @@ class ComprehensiveComparison:
         # Flatten matrices for UMAP
         X_flat = X.reshape(X.shape[0], -1)
         
-        # Standardize the data
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X_flat)
-        
         # Apply UMAP
-        reducer = umap.UMAP(n_components=n_components, random_state=42)
-        X_reduced = reducer.fit_transform(X_scaled)
+        reducer = umap.UMAP(n_components=min(n_components, X_flat.shape[1]), random_state=42)
+        X_reduced = reducer.fit_transform(X_flat)
         
         return X_reduced, "UMAP"
     
-    def apply_pbp_with_feature_selection(self, X, y, max_features_to_drop=0):
-        """Apply PBP with feature selection."""
+    def apply_pbp_with_feature_selection(self, X, y, dataset_name, dataset, max_features_to_drop=0):
+        """Apply PBP with feature selection and optimal aggregation function."""
         if pbp_vector is None:
             print("PBP not available, using PCA as fallback")
             return self.apply_pca(X)
         
-        print(f"Applying PBP with feature selection (max_drop={max_features_to_drop})")
+        # Get optimal aggregation function
+        agg_func = self.get_optimal_aggregation_function(dataset_name, dataset)
+        agg_func_name = self.optimal_aggregation_functions.get(dataset_name, 'sum')
+        
+        print(f"Applying PBP with {agg_func_name} aggregation (max_drop={max_features_to_drop})")
         
         # Get original matrix dimensions
         n_rows, n_cols = X.shape[1], X.shape[2]
@@ -174,13 +198,17 @@ class ComprehensiveComparison:
                 reduced_samples = []
                 for i in range(X.shape[0]):
                     try:
-                        pbp_result = pbp_vector(X[i])
+                        pbp_result = pbp_vector(X[i], agg_func)
                         reduced_samples.append(pbp_result)
                     except Exception as e:
                         print(f"Error processing sample {i}: {e}")
                         reduced_samples.append(X[i].flatten())
                 
                 X_reduced = np.array(reduced_samples)
+                
+                # Remove zero columns
+                zero_columns = np.all(X_reduced == 0, axis=0)
+                X_reduced = X_reduced[:, ~zero_columns]
                 
                 # Evaluate clustering
                 if len(np.unique(y)) > 1:
@@ -214,13 +242,17 @@ class ComprehensiveComparison:
                             if row_idx < modified_matrix.shape[0]:
                                 modified_matrix[row_idx, col_idx] = 0
                         
-                        pbp_result = pbp_vector(modified_matrix)
+                        pbp_result = pbp_vector(modified_matrix, agg_func)
                         reduced_samples.append(pbp_result)
                     except Exception as e:
                         print(f"Error processing sample {i}: {e}")
                         reduced_samples.append(X[i].flatten())
                 
                 X_reduced = np.array(reduced_samples)
+                
+                # Remove zero columns
+                zero_columns = np.all(X_reduced == 0, axis=0)
+                X_reduced = X_reduced[:, ~zero_columns]
                 
                 # Evaluate clustering
                 if len(np.unique(y)) > 1:
@@ -235,13 +267,13 @@ class ComprehensiveComparison:
                     best_reduction = X_reduced
                     best_features_dropped = features_to_drop
         
-        return best_reduction, f"PBP (dropped {best_features_dropped} features)"
+        return best_reduction, f"PBP ({agg_func_name}, dropped {best_features_dropped} features)"
     
     def evaluate_clustering(self, X_reduced, y_true, method_name):
         """Evaluate clustering performance."""
         if len(np.unique(y_true)) <= 1:
             return {
-                'silhouette_score': 0,
+                'silhouette_score': 0.0,
                 'davies_bouldin_score': float('inf'),
                 'method': method_name,
                 'n_clusters': 1
@@ -275,21 +307,19 @@ class ComprehensiveComparison:
         
         X = dataset['X']
         y = dataset['y']
-        metadata = dataset['metadata']
         
         print(f"Dataset shape: {X.shape}")
         print(f"Number of classes: {len(np.unique(y))}")
-        
-        results = {}
         
         # Apply different methods
         methods = [
             ('PCA', lambda: self.apply_pca(X)),
             ('t-SNE', lambda: self.apply_tsne(X)),
             ('UMAP', lambda: self.apply_umap(X)),
-            ('PBP', lambda: self.apply_pbp_with_feature_selection(X, y))
+            ('PBP', lambda: self.apply_pbp_with_feature_selection(X, y, dataset_name, dataset))
         ]
         
+        results = {}
         for method_name, method_func in methods:
             try:
                 print(f"\nApplying {method_name}...")
@@ -311,93 +341,119 @@ class ComprehensiveComparison:
                     'error': str(e)
                 }
         
-        # Store results
-        self.results[dataset_name] = results
-        
         return results
     
     def run_comprehensive_comparison(self):
-        """Run comprehensive comparison on all available datasets."""
-        print("Running comprehensive comparison on all datasets...")
-        
-        # List of datasets to test
-        datasets = [
-            'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
-            'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
-            # Conforming datasets
-            'seeds', 'thyroid', 'pima', 'ionosphere', 'glass_conforming'
-        ]
+        """Run comprehensive comparison across all datasets."""
+        # Get all available datasets from the consolidated loader
+        try:
+            from ..data.consolidated_loader import ConsolidatedDatasetLoader
+            loader = ConsolidatedDatasetLoader()
+            dataset_config = loader.get_available_datasets()
+            
+            # Flatten all datasets into a single list
+            all_datasets = []
+            for category, datasets in dataset_config.items():
+                all_datasets.extend(datasets)
+            
+            print(f"Found {len(all_datasets)} datasets across {len(dataset_config)} categories")
+            print("Running comprehensive comparison...")
+            
+        except Exception as e:
+            print(f"Error getting dataset configuration: {e}")
+            # Fallback to a subset of datasets
+            all_datasets = [
+                'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
+                'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
+                'seeds', 'thyroid', 'pima', 'ionosphere', 'spectf',
+                'glass_conforming', 'covertype', 'kddcup99', 'linnerrud', 'species_distribution'
+            ]
+            print(f"Using fallback dataset list: {len(all_datasets)} datasets")
         
         all_results = {}
         
-        for dataset_name in tqdm(datasets, desc="Processing datasets"):
+        for dataset_name in tqdm(all_datasets, desc="Comparing datasets"):
             try:
                 results = self.compare_methods(dataset_name)
                 if results:
                     all_results[dataset_name] = results
             except Exception as e:
-                print(f"Error processing {dataset_name}: {e}")
+                print(f"Error comparing {dataset_name}: {e}")
         
-        # Generate summary
+        # Generate comprehensive summary
         self.generate_comprehensive_summary(all_results)
         
         return all_results
     
     def generate_comprehensive_summary(self, all_results):
-        """Generate a comprehensive summary of all results."""
+        """Generate a comprehensive summary of all comparison results."""
         print(f"\n{'='*80}")
         print("COMPREHENSIVE COMPARISON SUMMARY")
         print(f"{'='*80}")
         
+        if not all_results:
+            print("No results available for summary.")
+            return
+        
         # Create summary DataFrame
         summary_data = []
-        
         for dataset_name, results in all_results.items():
-            for method_name, evaluation in results.items():
-                if 'error' not in evaluation:
-                    summary_data.append({
-                        'Dataset': dataset_name,
-                        'Method': method_name,
-                        'Silhouette_Score': evaluation['silhouette_score'],
-                        'Davies_Bouldin_Score': evaluation['davies_bouldin_score'],
-                        'N_Clusters': evaluation['n_clusters']
-                    })
+            for method_name, result in results.items():
+                summary_data.append({
+                    'Dataset': dataset_name,
+                    'Method': result['method'],
+                    'Silhouette_Score': result['silhouette_score'],
+                    'Davies_Bouldin_Score': result['davies_bouldin_score'],
+                    'N_Clusters': result.get('n_clusters', 0)
+                })
         
-        if summary_data:
-            summary_df = pd.DataFrame(summary_data)
-            
-            # Save summary to CSV
-            output_file = f"{self.results_dir}/tables/comprehensive_comparison_summary.csv"
-            summary_df.to_csv(output_file, index=False)
-            print(f"Summary saved to: {output_file}")
-            
-            # Print summary statistics
-            print("\nSummary Statistics:")
-            print("-" * 50)
-            
-            # Best method per dataset
-            print("\nBest method per dataset (by Silhouette Score):")
-            best_per_dataset = summary_df.loc[summary_df.groupby('Dataset')['Silhouette_Score'].idxmax()]
-            for _, row in best_per_dataset.iterrows():
-                print(f"  {row['Dataset']}: {row['Method']} (Score: {row['Silhouette_Score']:.4f})")
-            
-            # Overall best method
-            print(f"\nOverall best method: {summary_df.loc[summary_df['Silhouette_Score'].idxmax(), 'Method']}")
-            print(f"Best score: {summary_df['Silhouette_Score'].max():.4f}")
-            
-            # Method rankings
-            print("\nMethod rankings (average Silhouette Score):")
-            method_rankings = summary_df.groupby('Method')['Silhouette_Score'].agg(['mean', 'std']).sort_values('mean', ascending=False)
-            for method, stats in method_rankings.iterrows():
-                print(f"  {method}: {stats['mean']:.4f} ± {stats['std']:.4f}")
+        summary_df = pd.DataFrame(summary_data)
+        
+        # Save summary to CSV
+        output_file = f"{self.results_dir}/tables/comprehensive_comparison_summary_optimized.csv"
+        summary_df.to_csv(output_file, index=False)
+        print(f"Summary saved to: {output_file}")
+        
+        # Print summary statistics
+        print("\nSummary Statistics:")
+        print("-" * 50)
+        
+        # Method rankings
+        method_rankings = summary_df.groupby('Method')['Silhouette_Score'].agg(['mean', 'std']).sort_values('mean', ascending=False)
+        print("\nMethod Rankings (by average Silhouette Score):")
+        for method, stats in method_rankings.iterrows():
+            print(f"  {method}: {stats['mean']:.4f} ± {stats['std']:.4f}")
+        
+        # PBP performance analysis
+        if self.use_optimized_aggregation:
+            pbp_results = summary_df[summary_df['Method'].str.contains('PBP')]
+            if not pbp_results.empty:
+                print(f"\nPBP Performance Analysis:")
+                print(f"  Average PBP Silhouette Score: {pbp_results['Silhouette_Score'].mean():.4f} ± {pbp_results['Silhouette_Score'].std():.4f}")
+                print(f"  Best PBP Score: {pbp_results['Silhouette_Score'].max():.4f}")
+                print(f"  PBP wins: {len(pbp_results[pbp_results['Silhouette_Score'] == pbp_results.groupby('Dataset')['Silhouette_Score'].transform('max')])} out of {len(pbp_results)} comparisons")
         
         else:
-            print("No valid results to summarize.")
+            print("\nNo aggregation optimization data available.")
+        
+        # Best performing dataset for each method
+        print(f"\nBest performing dataset for each method:")
+        for method in summary_df['Method'].unique():
+            method_data = summary_df[summary_df['Method'] == method]
+            best_dataset = method_data.loc[method_data['Silhouette_Score'].idxmax()]
+            print(f"  {method}: {best_dataset['Dataset']} ({best_dataset['Silhouette_Score']:.4f})")
 
 
 def main():
     """Main function to run comprehensive comparison."""
-    comparison = ComprehensiveComparison('./data')
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Comprehensive comparison of dimensionality reduction methods")
+    parser.add_argument("--no-optimization", action="store_true", help="Disable aggregation function optimization")
+    args = parser.parse_args()
+    
+    use_optimization = not args.no_optimization
+    comparison = ComprehensiveComparison('./data', use_optimized_aggregation=use_optimization)
     results = comparison.run_comprehensive_comparison()
     
     if results:
