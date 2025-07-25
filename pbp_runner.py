@@ -23,7 +23,8 @@ from src.pbp.core import (
     decode_var,
     truncate_pBp,
     trunc_driver,
-    to_string
+    to_string,
+    get_pbp_from_vector
 )
 
 # Re-export all functions
@@ -39,7 +40,8 @@ __all__ = [
     "decode_var",
     "truncate_pBp",
     "trunc_driver",
-    "to_string"
+    "to_string",
+    "get_pbp_from_vector"
 ]
 
 if __name__ == "__main__":
@@ -53,23 +55,30 @@ if __name__ == "__main__":
         [9, 6, 7, 1, 5]
     ])
 
+    pbp = create_pbp(c)
+    pbp["y_str"] = pbp["y"].apply(lambda x: decode_var(x))
+    print(pbp)
+    
+
     v = pbp_vector(c)
     print("PBP Vector Result:")
     print(v)
+
+    get_pbp_from_vector(v)
     
 
-    c = np.array([
-        [5.4, 3.4],
-        [1.7, 0.2],
-    ])
-    v = pbp_vector(c)
-    print("\nPBP Vector Result (2x2):")
-    print(v)
+    # c = np.array([
+    #     [5.4, 3.4],
+    #     [1.7, 0.2],
+    # ])
+    # v = pbp_vector(c)
+    # print("\nPBP Vector Result (2x2):")
+    # print(v)
 
-    c = np.array([
-        [5.1, 3.7],
-        [1.5, 0.4],
-    ])
-    v = pbp_vector(c)
-    print("\nPBP Vector Result (2x2):")
-    print(v) 
+    # c = np.array([
+    #     [5.1, 3.7],
+    #     [1.5, 0.4],
+    # ])
+    # v = pbp_vector(c)
+    # print("\nPBP Vector Result (2x2):")
+    # print(v) 

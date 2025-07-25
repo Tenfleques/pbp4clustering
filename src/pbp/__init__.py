@@ -18,7 +18,8 @@ from .core import (
     decode_var,
     truncate_pBp,
     trunc_driver,
-    to_string
+    to_string,
+    get_pbp_from_vector
 )
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "decode_var",
     "truncate_pBp",
     "trunc_driver",
-    "to_string"
+    "to_string",
+    "get_pbp_from_vector"
 ] 

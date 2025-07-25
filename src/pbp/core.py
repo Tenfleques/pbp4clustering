@@ -220,6 +220,25 @@ def pbp_vector(c: np.array, agg_func: Callable[[pd.Series], Any] = lambda x: x.s
     return vector
 
 
+def get_pbp_from_vector(vector: np.array):
+    """
+    Creates a polynomial basis representation (pBp) from a given vector.
+    """
+    occupied_positions = np.nonzero(vector)[0]
+    y = np.zeros(vector.shape[0], dtype=int)
+    
+    pbp = pd.DataFrame()
+    pbp["y"] = occupied_positions
+    pbp["coeffs"] = vector[occupied_positions]
+    pbp["degree"] = pbp["y"].apply(calculate_degree)
+    pbp["y_str"] = pbp["y"].apply(lambda x: decode_var(x))
+    pbp.sort_values(by=['degree'], inplace=True)
+    blankIndex=[''] * len(pbp)
+    pbp.index=blankIndex
+
+
+    return pbp
+
 if __name__ == "__main__":
     # c = np.array([
     #     [7, 8, 2, 10, 3],

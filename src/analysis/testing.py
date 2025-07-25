@@ -21,6 +21,8 @@ from tqdm import tqdm
 import argparse
 logging.getLogger('matplotlib.font_manager').disabled = True
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Import PBP modules
 try:
     from ..pbp.core import pbp_vector
@@ -213,6 +215,29 @@ class DatasetTester:
             'cluster_centers': kmeans.cluster_centers_
         }
     
+    def get_pbp_component_names(self, vector_length, num_rows):
+        """
+        Generate meaningful names for PBP vector components based on their position.
+        
+        Args:
+            vector_length: Length of the PBP vector (2^num_rows - 1)
+            num_rows: Number of rows in the original matrix
+        
+        Returns:
+            List of component names
+        """
+        from ..pbp.core import decode_var
+        
+        component_names = []
+        for i in range(vector_length):
+            decoded = decode_var(i)
+            if decoded == "":
+                component_names.append("Aggregated (min)")
+            else:
+                component_names.append(f"Aggregated ({decoded})")
+        
+        return component_names
+    
     def visualize_results(self, X_reduced, y_true, y_pred, dataset_name, metadata, method_label="PBP"):
         """Visualize clustering results."""
         # Ensure y_true and y_pred are numeric and the same length as X_reduced
@@ -229,17 +254,38 @@ class DatasetTester:
             print(f"Skipping visualization for {dataset_name}: y_pred length mismatch.")
             return
 
+        # Generate PBP component names if this is a PBP method
+        if "PBP" in method_label:
+            # Estimate original matrix dimensions from the method label or metadata
+            # For now, we'll use a reasonable default based on the reduced shape
+            estimated_rows = min(3, X_reduced.shape[1])  # Conservative estimate
+            pbp_component_names = self.get_pbp_component_names(X_reduced.shape[1], estimated_rows)
+        else:
+            pbp_component_names = None
+
         fig, axes = plt.subplots(1, 2, figsize=(15, 6))
         scatter1 = axes[0].scatter(X_reduced[:, 0], X_reduced[:, 1], c=y_true, cmap='viridis', alpha=0.7)
         axes[0].set_title(f'{dataset_name} - True Labels\n({method_label})')
-        axes[0].set_xlabel('Component 1')
-        axes[0].set_ylabel('Component 2')
+        
+        # Use PBP component names if available, otherwise fallback to generic names
+        if pbp_component_names and len(pbp_component_names) >= 2:
+            axes[0].set_xlabel(pbp_component_names[0])
+            axes[0].set_ylabel(pbp_component_names[1])
+        else:
+            axes[0].set_xlabel('Component 1')
+            axes[0].set_ylabel('Component 2')
         plt.colorbar(scatter1, ax=axes[0])
 
         scatter2 = axes[1].scatter(X_reduced[:, 0], X_reduced[:, 1], c=y_pred, cmap='viridis', alpha=0.7)
         axes[1].set_title(f'{dataset_name} - Predicted Clusters\n({method_label})')
-        axes[1].set_xlabel('Component 1')
-        axes[1].set_ylabel('Component 2')
+        
+        # Use PBP component names if available, otherwise fallback to generic names
+        if pbp_component_names and len(pbp_component_names) >= 2:
+            axes[1].set_xlabel(pbp_component_names[0])
+            axes[1].set_ylabel(pbp_component_names[1])
+        else:
+            axes[1].set_xlabel('Component 1')
+            axes[1].set_ylabel('Component 2')
         plt.colorbar(scatter2, ax=axes[1])
 
         plt.tight_layout()
@@ -254,17 +300,31 @@ class DatasetTester:
             scatter1 = ax1.scatter(X_reduced[:, 0], X_reduced[:, 1], X_reduced[:, 2], 
                                   c=y_true, cmap='viridis', alpha=0.7)
             ax1.set_title(f'{dataset_name} - True Labels (3D)')
-            ax1.set_xlabel('Component 1')
-            ax1.set_ylabel('Component 2')
-            ax1.set_zlabel('Component 3')
+            
+            # Use PBP component names if available, otherwise fallback to generic names
+            if pbp_component_names and len(pbp_component_names) >= 3:
+                ax1.set_xlabel(pbp_component_names[0])
+                ax1.set_ylabel(pbp_component_names[1])
+                ax1.set_zlabel(pbp_component_names[2])
+            else:
+                ax1.set_xlabel('Component 1')
+                ax1.set_ylabel('Component 2')
+                ax1.set_zlabel('Component 3')
             
             ax2 = fig.add_subplot(122, projection='3d')
             scatter2 = ax2.scatter(X_reduced[:, 0], X_reduced[:, 1], X_reduced[:, 2], 
                                   c=y_pred, cmap='viridis', alpha=0.7)
             ax2.set_title(f'{dataset_name} - Predicted Clusters (3D)')
-            ax2.set_xlabel('Component 1')
-            ax2.set_ylabel('Component 2')
-            ax2.set_zlabel('Component 3')
+            
+            # Use PBP component names if available, otherwise fallback to generic names
+            if pbp_component_names and len(pbp_component_names) >= 3:
+                ax2.set_xlabel(pbp_component_names[0])
+                ax2.set_ylabel(pbp_component_names[1])
+                ax2.set_zlabel(pbp_component_names[2])
+            else:
+                ax2.set_xlabel('Component 1')
+                ax2.set_ylabel('Component 2')
+                ax2.set_zlabel('Component 3')
             
             plt.tight_layout()
             plt.savefig(f"{self.results_dir}/figures/{dataset_name}_clustering_3d_{method_label.replace(' ', '_')}.png", dpi=300, bbox_inches='tight')
@@ -378,7 +438,20 @@ class DatasetTester:
         
         # Create summary table
         summary_data = []
+        pbp_component_info = {}
+        
         for name, result in results.items():
+            # Get PBP component names if this is a PBP method
+            pbp_components = []
+            if "PBP" in result.get('method_label', ''):
+                try:
+                    reduced_shape = result['reduced_shape'][1]
+                    estimated_rows = min(3, reduced_shape)  # Conservative estimate
+                    pbp_components = self.get_pbp_component_names(reduced_shape, estimated_rows)
+                    pbp_component_info[name] = pbp_components
+                except Exception as e:
+                    print(f"Warning: Could not generate PBP component names for {name}: {e}")
+            
             summary_data.append({
                 'Dataset': name,
                 'Original Shape': f"{result['original_shape'][1]}x{result['original_shape'][2]}",
@@ -386,7 +459,8 @@ class DatasetTester:
                 'Aggregation Function': result.get('aggregation_function', 'sum'),
                 'Silhouette Score': f"{result['clustering_results']['silhouette_score']:.4f}",
                 'Davies-Bouldin Score': f"{result['clustering_results']['davies_bouldin_score']:.4f}",
-                'Description': result['metadata']['description']
+                'Description': result['metadata']['description'],
+                'PBP Components': len(pbp_components) if pbp_components else 'N/A'
             })
         
         summary_df = pd.DataFrame(summary_data)
@@ -395,6 +469,17 @@ class DatasetTester:
         # Save summary to file
         summary_df.to_csv(f"{self.results_dir}/tables/test_summary_pbp_vector_optimized.csv", index=False)
         print(f"\nSummary saved to {self.results_dir}/tables/test_summary_pbp_vector_optimized.csv")
+        
+        # Print PBP component information for datasets that use PBP
+        if pbp_component_info:
+            print(f"\n{'='*60}")
+            print("PBP COMPONENT BREAKDOWN")
+            print(f"{'='*60}")
+            
+            for dataset_name, components in pbp_component_info.items():
+                print(f"\n{dataset_name}:")
+                for i, component in enumerate(components):
+                    print(f"  Component {i+1}: {component}")
         
         # Find best performing datasets
         best_silhouette = max(results.items(), 

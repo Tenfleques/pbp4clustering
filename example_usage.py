@@ -209,6 +209,22 @@ def visualization_example():
     
     pbp_vectors = np.array(pbp_vectors)
     
+    # Generate PBP component names
+    from src.pbp.core import decode_var
+    def get_pbp_component_names(vector_length, num_rows):
+        """Generate meaningful names for PBP vector components based on their position."""
+        component_names = []
+        for i in range(vector_length):
+            decoded = decode_var(i)
+            if decoded == "":
+                component_names.append("Aggregated (min)")
+            else:
+                component_names.append(f"Aggregated ({decoded})")
+        return component_names
+    
+    # Get component names for iris (2x2 matrix = 3 components)
+    component_names = get_pbp_component_names(pbp_vectors.shape[1], 2)
+    
     # Apply clustering
     n_clusters = len(np.unique(y))
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
@@ -220,15 +236,15 @@ def visualization_example():
     # Plot 1: True labels
     scatter1 = axes[0].scatter(pbp_vectors[:, 0], pbp_vectors[:, 1], c=y, cmap='viridis', alpha=0.7)
     axes[0].set_title('Iris Dataset - True Labels (PBP)')
-    axes[0].set_xlabel('PBP Component 1')
-    axes[0].set_ylabel('PBP Component 2')
+    axes[0].set_xlabel(component_names[0])
+    axes[0].set_ylabel(component_names[1])
     plt.colorbar(scatter1, ax=axes[0])
     
     # Plot 2: Predicted labels
     scatter2 = axes[1].scatter(pbp_vectors[:, 0], pbp_vectors[:, 1], c=y_pred, cmap='viridis', alpha=0.7)
     axes[1].set_title('Iris Dataset - Predicted Labels (PBP)')
-    axes[1].set_xlabel('PBP Component 1')
-    axes[1].set_ylabel('PBP Component 2')
+    axes[1].set_xlabel(component_names[0])
+    axes[1].set_ylabel(component_names[1])
     plt.colorbar(scatter2, ax=axes[1])
     
     plt.tight_layout()
@@ -236,6 +252,7 @@ def visualization_example():
     plt.show()
     
     print("Visualization saved as 'results/figures/example_visualization.png'")
+    print(f"Component names used: {component_names[0]}, {component_names[1]}")
 
 
 def main():
