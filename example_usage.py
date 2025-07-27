@@ -225,6 +225,11 @@ def visualization_example():
     # Get component names for iris (2x2 matrix = 3 components)
     component_names = get_pbp_component_names(pbp_vectors.shape[1], 2)
     
+
+    zero_columns = np.where(np.sum(pbp_vectors, axis=0) == 0)[0]
+    pbp_vectors = np.delete(pbp_vectors, zero_columns, axis=1)
+    component_names = np.delete(component_names, zero_columns)
+
     # Apply clustering
     n_clusters = len(np.unique(y))
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
