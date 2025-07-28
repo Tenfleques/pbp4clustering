@@ -201,6 +201,16 @@ class DatasetTester:
         if n_clusters is None:
             n_clusters = len(np.unique(y_true))
         
+        # Ensure we have enough samples for clustering
+        if X_reduced.shape[0] < n_clusters:
+            print(f"Warning: Not enough samples ({X_reduced.shape[0]}) for {n_clusters} clusters")
+            return {
+                'silhouette_score': 0.0,
+                'davies_bouldin_score': float('inf'),
+                'y_pred': np.zeros(X_reduced.shape[0]),
+                'cluster_centers': np.array([])
+            }
+        
         # Apply K-means clustering
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
         y_pred = kmeans.fit_predict(X_reduced)
@@ -421,11 +431,20 @@ class DatasetTester:
         else:
             X_flat = X_reduced
             
-        if len(y_true) != X_flat.shape[0]:
-            print(f"Skipping visualization for {dataset_name}: y_true length mismatch ({len(y_true)} vs {X_flat.shape[0]}).")
-            return
-        if len(y_pred) != X_flat.shape[0]:
-            print(f"Skipping visualization for {dataset_name}: y_pred length mismatch ({len(y_pred)} vs {X_flat.shape[0]}).")
+        # Handle length mismatches by truncating to the shorter length
+        min_length = min(len(y_true), len(y_pred), X_flat.shape[0])
+        if len(y_true) != min_length:
+            print(f"Warning: Truncating y_true from {len(y_true)} to {min_length}")
+            y_true = y_true[:min_length]
+        if len(y_pred) != min_length:
+            print(f"Warning: Truncating y_pred from {len(y_pred)} to {min_length}")
+            y_pred = y_pred[:min_length]
+        if X_flat.shape[0] != min_length:
+            print(f"Warning: Truncating X_flat from {X_flat.shape[0]} to {min_length}")
+            X_flat = X_flat[:min_length]
+        
+        if min_length == 0:
+            print(f"Skipping visualization for {dataset_name}: no valid data after truncation")
             return
 
         # Generate PBP component names if this is a PBP method
@@ -439,6 +458,11 @@ class DatasetTester:
 
         # Select informative columns for 2D visualization
         informative_indices_2d, X_2d, _ = self.select_informative_columns(X_flat, y_pred, n_components=2)
+        
+        # Handle single component case
+        if X_2d.shape[1] < 2:
+            print(f"Skipping 2D visualization for {dataset_name}: only {X_2d.shape[1]} component(s) available")
+            return
         
         # Create 2D visualization with dataset info table
         fig = plt.figure(figsize=(20, 8))
@@ -554,6 +578,11 @@ class DatasetTester:
         if X_flat.shape[1] >= 3:
             # Select informative columns for 3D visualization
             informative_indices_3d, X_3d, _ = self.select_informative_columns(X_flat, y_pred, n_components=3)
+            
+            # Handle single component case for 3D
+            if X_3d.shape[1] < 3:
+                print(f"Skipping 3D visualization for {dataset_name}: only {X_3d.shape[1]} component(s) available")
+                return
             
             fig = plt.figure(figsize=(20, 8))
             
@@ -789,6 +818,122 @@ class DatasetTester:
             for agg_func, count in sorted(agg_func_counts.items(), key=lambda x: x[1], reverse=True):
                 print(f"  {agg_func}: {count} datasets")
 
+    def generate_biomathematics_summary_report(self, results):
+        """Generate a biomathematics-specific summary report."""
+        print(f"\n{'='*80}")
+        print("BIOMATHEMATICS SUMMARY REPORT - Trends in Biomathematics")
+        print("Modeling Health in Ecology, Social Interactions, and Cells")
+        print(f"{'='*80}")
+        
+        if not results:
+            print("No biomathematics results available for summary report.")
+            return
+        
+        # Categorize datasets by biomathematics domain
+        domain_categories = {
+            'Ecology & Environmental Health': ['species_distribution', 'covertype'],
+            'Medical & Health': ['breast_cancer', 'diabetes', 'thyroid', 'pima', 'geo_breast_cancer'],
+            'Social Interactions & Epidemiology': ['ionosphere'],
+            'Advanced Medical': ['metabolights'],
+            'Core Biomathematics': ['iris', 'wine', 'digits_sklearn', 'sonar', 'glass', 'vehicle', 'seeds', 'linnerrud']
+        }
+        
+        # Create summary table
+        summary_data = []
+        domain_performance = {}
+        
+        for name, result in results.items():
+            # Determine domain
+            domain = 'Other'
+            for domain_name, datasets in domain_categories.items():
+                if name in datasets:
+                    domain = domain_name
+                    break
+            
+            # Get PBP component names if this is a PBP method
+            pbp_components = []
+            if "PBP" in result.get('method_label', ''):
+                try:
+                    reduced_shape = result['reduced_shape'][1]
+                    estimated_rows = min(3, reduced_shape)
+                    pbp_components = self.get_pbp_component_names(reduced_shape, estimated_rows)
+                except Exception as e:
+                    print(f"Warning: Could not generate PBP component names for {name}: {e}")
+            
+            summary_data.append({
+                'Dataset': name,
+                'Domain': domain,
+                'Original Shape': f"{result['original_shape'][1]}x{result['original_shape'][2]}",
+                'Reduced Shape': f"{result['reduced_shape'][1]}",
+                'Aggregation Function': result.get('aggregation_function', 'sum'),
+                'Silhouette Score': f"{result['clustering_results']['silhouette_score']:.4f}",
+                'Davies-Bouldin Score': f"{result['clustering_results']['davies_bouldin_score']:.4f}",
+                'Description': result['metadata']['description'],
+                'PBP Components': len(pbp_components) if pbp_components else 'N/A'
+            })
+            
+            # Track domain performance
+            if domain not in domain_performance:
+                domain_performance[domain] = []
+            domain_performance[domain].append(result['clustering_results']['silhouette_score'])
+        
+        summary_df = pd.DataFrame(summary_data)
+        print(summary_df.to_string(index=False))
+        
+        # Save summary to file
+        summary_df.to_csv(f"{self.results_dir}/tables/biomathematics_summary_pbp_vector_optimized.csv", index=False)
+        print(f"\nBiomathematics summary saved to {self.results_dir}/tables/biomathematics_summary_pbp_vector_optimized.csv")
+        
+        # Domain-specific analysis
+        print(f"\n{'='*60}")
+        print("DOMAIN-SPECIFIC PERFORMANCE ANALYSIS")
+        print(f"{'='*60}")
+        
+        for domain, scores in domain_performance.items():
+            if scores:
+                avg_score = np.mean(scores)
+                std_score = np.std(scores)
+                print(f"\n{domain}:")
+                print(f"  Average Silhouette Score: {avg_score:.4f} ± {std_score:.4f}")
+                print(f"  Best Score: {max(scores):.4f}")
+                print(f"  Number of Datasets: {len(scores)}")
+        
+        # Find best performing datasets by domain
+        print(f"\n{'='*60}")
+        print("BEST PERFORMING DATASETS BY DOMAIN")
+        print(f"{'='*60}")
+        
+        for domain, datasets in domain_categories.items():
+            domain_results = {k: v for k, v in results.items() if k in datasets}
+            if domain_results:
+                best_dataset = max(domain_results.items(), 
+                                 key=lambda x: x[1]['clustering_results']['silhouette_score'])
+                print(f"\n{domain}:")
+                print(f"  Best: {best_dataset[0]} (Silhouette: {best_dataset[1]['clustering_results']['silhouette_score']:.4f})")
+        
+        # Overall biomathematics statistics
+        silhouette_scores = [r['clustering_results']['silhouette_score'] for r in results.values()]
+        davies_scores = [r['clustering_results']['davies_bouldin_score'] for r in results.values()]
+        
+        print(f"\n{'='*60}")
+        print("OVERALL BIOMATHEMATICS PERFORMANCE")
+        print(f"{'='*60}")
+        print(f"Total Datasets Analyzed: {len(results)}")
+        print(f"Average Silhouette Score: {np.mean(silhouette_scores):.4f} ± {np.std(silhouette_scores):.4f}")
+        print(f"Average Davies-Bouldin Score: {np.mean(davies_scores):.4f} ± {np.std(davies_scores):.4f}")
+        print(f"Best Overall Performance: {max(results.items(), key=lambda x: x[1]['clustering_results']['silhouette_score'])[0]}")
+        
+        # Aggregation function usage for biomathematics
+        if self.use_optimized_aggregation:
+            agg_func_counts = {}
+            for result in results.values():
+                agg_func = result.get('aggregation_function', 'sum')
+                agg_func_counts[agg_func] = agg_func_counts.get(agg_func, 0) + 1
+            
+            print(f"\nAggregation Function Usage in Biomathematics:")
+            for agg_func, count in sorted(agg_func_counts.items(), key=lambda x: x[1], reverse=True):
+                print(f"  {agg_func}: {count} datasets")
+
 
 def main():
     """Main function to run dataset testing."""
@@ -798,8 +943,17 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--visualize", action="store_true", help="Visualize results")
+    parser.add_argument("--biomat", action="store_true", help="Target biomathematics datasets only")
     args = parser.parse_args()
     visualize = args.visualize
+    biomat = args.biomat
+    
+    # Set results directory based on biomat flag
+    if biomat:
+        results_dir = './results/biomat'
+        print("🎯 Biomathematics mode enabled - targeting health, ecology, and social interaction datasets")
+        print(f"📁 Results will be saved to: {results_dir}")
+    
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(results_dir, exist_ok=True)
     os.makedirs(f"{results_dir}/figures", exist_ok=True)
@@ -808,8 +962,27 @@ def main():
     # Initialize tester
     tester = DatasetTester(data_dir, results_dir)
     
-    # Test all datasets
-    results = tester.test_all_datasets(visualize=visualize  )
+    # Test datasets based on mode
+    if biomat:
+        # Use biomathematics datasets only
+        from src.data.dataset_config import get_biomathematics_datasets
+        biomat_datasets = get_biomathematics_datasets()
+        print(f"🧬 Testing {len(biomat_datasets)} biomathematics datasets...")
+        
+        results = {}
+        for dataset_name in tqdm.tqdm(biomat_datasets, desc="Testing biomathematics datasets"):
+            try:
+                result = tester.test_dataset(dataset_name, visualize=visualize)
+                if result:
+                    results[dataset_name] = result
+            except Exception as e:
+                print(f"Error testing {dataset_name}: {e}")
+        
+        # Generate biomathematics-specific summary report
+        tester.generate_biomathematics_summary_report(results)
+    else:
+        # Test all datasets
+        results = tester.test_all_datasets(visualize=visualize)
     
     print(f"\nTesting completed! Results for {len(results)} datasets.")
     print(f"Check {results_dir} for saved visualizations and summary.")

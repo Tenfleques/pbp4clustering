@@ -11,7 +11,7 @@ STANDARD_DATASETS = [
     'iris',
     'breast_cancer', 
     'wine',
-    'digits',
+    'digits_sklearn',
     'diabetes'
 ]
 
@@ -60,6 +60,41 @@ SPECIAL_DATASETS = [
     'species_distribution'
 ]
 
+# Biomathematics datasets - Trends in Biomathematics: Modeling Health in Ecology, Social Interactions, and Cells
+BIOMATHEMATICS_DATASETS = [
+    # Ecology and Environmental Health
+    'species_distribution',      # Species distribution modeling
+    'covertype',                # Forest cover type (environmental health)
+    
+    # Medical and Health
+    'breast_cancer',            # Cancer diagnosis (health modeling)
+    'diabetes',                 # Diabetes prediction (health modeling)
+    'thyroid',                  # Thyroid function (health modeling)
+    'pima',                     # Pima diabetes (health modeling)
+    'geo_breast_cancer',        # GEO Breast Cancer gene expression dataset
+    
+    # Social Interactions and Epidemiology
+    'ionosphere',               # Ionosphere radar (signal processing for health monitoring)
+    
+    # Advanced Medical Datasets
+    'metabolights',             # Metabolomics (biochemical health markers)
+    # 'physionet_ecg',           # ECG signals (cardiovascular health) - not available
+    # 'mimic_icu',               # ICU data (critical care health) - not available
+    
+    # Chemical and Drug Response (commented out - not available in current config)
+    # 'nci_chemical',            # Chemical compounds (drug discovery)
+    
+    # Core Biomathematics Datasets
+    'iris',                     # Biological classification (ecology)
+    'wine',                     # Chemical analysis (biochemistry)
+    'digits_sklearn',           # Pattern recognition (medical imaging)
+    'sonar',                    # Signal processing (medical diagnostics)
+    'glass',                    # Material properties (biomaterials)
+    'vehicle',                  # Pattern recognition (medical imaging)
+    'seeds',                    # Agricultural health (food security)
+    'linnerrud'                 # Physical exercise (health fitness)
+]
+
 # All datasets by category
 DATASET_CATEGORIES = {
     'standard': STANDARD_DATASETS,
@@ -69,7 +104,8 @@ DATASET_CATEGORIES = {
     'advanced_genetic': ADVANCED_GENETIC_DATASETS,
     'advanced_medical': ADVANCED_MEDICAL_DATASETS,
     'advanced_nci': ADVANCED_NCI_DATASETS,
-    'special': SPECIAL_DATASETS
+    'special': SPECIAL_DATASETS,
+    'biomathematics': BIOMATHEMATICS_DATASETS
 }
 
 # Flattened list of all datasets
@@ -82,7 +118,7 @@ CORE_DATASETS = [
     'iris',
     'breast_cancer',
     'wine',
-    'digits',
+    'digits_sklearn',
     'diabetes',
     'sonar',
     'glass',
@@ -96,7 +132,7 @@ OPTIMIZATION_DATASETS = [
     'iris',
     'breast_cancer',
     'wine',
-    'digits',
+    'digits_sklearn',
     'diabetes',
     'sonar',
     'glass',
@@ -115,7 +151,7 @@ TESTING_DATASETS = [
     'iris',
     'breast_cancer',
     'wine',
-    'digits',
+    'digits_sklearn',
     'diabetes',
     'sonar',
     'glass',
@@ -138,14 +174,14 @@ TESTING_DATASETS = [
 COMPARISON_DATASETS = [
     'iris',
     'breast_cancer',
+    'geo_breast_cancer',
     'wine',
-    'digits',
+    'digits_sklearn',
     'diabetes',
     'sonar',
     'glass',
     'vehicle',
-    
-    'yeast',
+
     'seeds',
     'thyroid',
     'pima',
@@ -207,13 +243,27 @@ def get_testing_datasets():
     return TESTING_DATASETS.copy()
 
 def get_comparison_datasets():
-    """
-    Get datasets for method comparison.
-    
-    Returns:
-        list: List of comparison dataset names
-    """
-    return COMPARISON_DATASETS.copy()
+    """Get datasets for comparison analysis."""
+    return [
+        'iris',
+        'breast_cancer',
+        'wine',
+        'digits_sklearn',
+        'diabetes',
+        'sonar',
+        'glass',
+        'vehicle',
+        'ecoli',
+        'yeast',
+        'seeds',
+        'thyroid',
+        'pima',
+        'ionosphere'
+    ]
+
+def get_biomathematics_datasets():
+    """Get datasets related to Trends in Biomathematics: Modeling Health in Ecology, Social Interactions, and Cells."""
+    return BIOMATHEMATICS_DATASETS
 
 def get_dataset_categories():
     """

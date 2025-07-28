@@ -385,6 +385,33 @@ class ComprehensiveComparison:
         
         return all_results
     
+    def run_biomathematics_comparison(self):
+        """Run comprehensive comparison across biomathematics datasets only."""
+        # Get biomathematics datasets
+        try:
+            from ..data.dataset_config import get_biomathematics_datasets
+            biomat_datasets = get_biomathematics_datasets()
+            print(f"🧬 Found {len(biomat_datasets)} biomathematics datasets")
+            print("Running biomathematics comparison...")
+        except Exception as e:
+            print(f"Error getting biomathematics datasets: {e}")
+            return {}
+        
+        all_results = {}
+        
+        for dataset_name in tqdm(biomat_datasets, desc="Comparing biomathematics datasets"):
+            try:
+                results = self.compare_methods(dataset_name)
+                if results:
+                    all_results[dataset_name] = results
+            except Exception as e:
+                print(f"Error comparing {dataset_name}: {e}")
+        
+        # Generate biomathematics-specific summary
+        self.generate_biomathematics_comprehensive_summary(all_results)
+        
+        return all_results
+    
     def generate_comprehensive_summary(self, all_results):
         """Generate a comprehensive summary of all comparison results."""
         print(f"\n{'='*80}")
@@ -443,6 +470,113 @@ class ComprehensiveComparison:
             best_dataset = method_data.loc[method_data['Silhouette_Score'].idxmax()]
             print(f"  {method}: {best_dataset['Dataset']} ({best_dataset['Silhouette_Score']:.4f})")
 
+    def generate_biomathematics_comprehensive_summary(self, all_results):
+        """Generate a biomathematics-specific comprehensive summary."""
+        print(f"\n{'='*80}")
+        print("BIOMATHEMATICS COMPREHENSIVE COMPARISON SUMMARY")
+        print("Trends in Biomathematics: Modeling Health in Ecology, Social Interactions, and Cells")
+        print(f"{'='*80}")
+        
+        if not all_results:
+            print("No biomathematics results available for summary.")
+            return
+        
+        # Categorize datasets by biomathematics domain
+        domain_categories = {
+            'Ecology & Environmental Health': ['species_distribution', 'covertype'],
+            'Medical & Health': ['breast_cancer', 'diabetes', 'thyroid', 'pima', 'geo_breast_cancer'],
+            'Social Interactions & Epidemiology': ['ionosphere'],
+            'Advanced Medical': ['metabolights'],
+            'Core Biomathematics': ['iris', 'wine', 'digits_sklearn', 'sonar', 'glass', 'vehicle', 'seeds', 'linnerrud']
+        }
+        
+        # Create summary DataFrame
+        summary_data = []
+        domain_performance = {}
+        
+        for dataset_name, results in all_results.items():
+            # Determine domain
+            domain = 'Other'
+            for domain_name, datasets in domain_categories.items():
+                if dataset_name in datasets:
+                    domain = domain_name
+                    break
+            
+            for method_name, result in results.items():
+                summary_data.append({
+                    'Dataset': dataset_name,
+                    'Domain': domain,
+                    'Method': result['method'],
+                    'Silhouette_Score': result['silhouette_score'],
+                    'Davies_Bouldin_Score': result['davies_bouldin_score'],
+                    'N_Clusters': result.get('n_clusters', 0)
+                })
+                
+                # Track domain performance
+                if domain not in domain_performance:
+                    domain_performance[domain] = []
+                domain_performance[domain].append(result['silhouette_score'])
+        
+        summary_df = pd.DataFrame(summary_data)
+        
+        # Save summary to CSV
+        output_file = f"{self.results_dir}/tables/biomathematics_comprehensive_comparison_summary_optimized.csv"
+        summary_df.to_csv(output_file, index=False)
+        print(f"Biomathematics summary saved to: {output_file}")
+        
+        # Print summary statistics
+        print("\nBiomathematics Summary Statistics:")
+        print("-" * 50)
+        
+        # Method rankings for biomathematics
+        method_rankings = summary_df.groupby('Method')['Silhouette_Score'].agg(['mean', 'std']).sort_values('mean', ascending=False)
+        print("\nMethod Rankings for Biomathematics (by average Silhouette Score):")
+        for method, stats in method_rankings.iterrows():
+            print(f"  {method}: {stats['mean']:.4f} ± {stats['std']:.4f}")
+        
+        # Domain-specific analysis
+        print(f"\n{'='*60}")
+        print("DOMAIN-SPECIFIC PERFORMANCE IN BIOMATHEMATICS")
+        print(f"{'='*60}")
+        
+        for domain, scores in domain_performance.items():
+            if scores:
+                avg_score = np.mean(scores)
+                std_score = np.std(scores)
+                print(f"\n{domain}:")
+                print(f"  Average Silhouette Score: {avg_score:.4f} ± {std_score:.4f}")
+                print(f"  Best Score: {max(scores):.4f}")
+                print(f"  Number of Results: {len(scores)}")
+        
+        # PBP performance analysis for biomathematics
+        if self.use_optimized_aggregation:
+            pbp_results = summary_df[summary_df['Method'].str.contains('PBP')]
+            if not pbp_results.empty:
+                print(f"\nPBP Performance in Biomathematics:")
+                print(f"  Average PBP Silhouette Score: {pbp_results['Silhouette_Score'].mean():.4f} ± {pbp_results['Silhouette_Score'].std():.4f}")
+                print(f"  Best PBP Score: {pbp_results['Silhouette_Score'].max():.4f}")
+                print(f"  PBP wins: {len(pbp_results[pbp_results['Silhouette_Score'] == pbp_results.groupby('Dataset')['Silhouette_Score'].transform('max')])} out of {len(pbp_results)} comparisons")
+        
+        # Best performing dataset for each method in biomathematics
+        print(f"\nBest performing biomathematics dataset for each method:")
+        for method in summary_df['Method'].unique():
+            method_data = summary_df[summary_df['Method'] == method]
+            best_dataset = method_data.loc[method_data['Silhouette_Score'].idxmax()]
+            print(f"  {method}: {best_dataset['Dataset']} ({best_dataset['Silhouette_Score']:.4f})")
+        
+        # Overall biomathematics statistics
+        print(f"\n{'='*60}")
+        print("OVERALL BIOMATHEMATICS COMPARISON STATISTICS")
+        print(f"{'='*60}")
+        print(f"Total Datasets Analyzed: {len(all_results)}")
+        print(f"Total Method Comparisons: {len(summary_df)}")
+        print(f"Average Silhouette Score: {summary_df['Silhouette_Score'].mean():.4f} ± {summary_df['Silhouette_Score'].std():.4f}")
+        print(f"Average Davies-Bouldin Score: {summary_df['Davies_Bouldin_Score'].mean():.4f} ± {summary_df['Davies_Bouldin_Score'].std():.4f}")
+        
+        # Find best overall performance
+        best_overall = summary_df.loc[summary_df['Silhouette_Score'].idxmax()]
+        print(f"Best Overall Performance: {best_overall['Method']} on {best_overall['Dataset']} ({best_overall['Silhouette_Score']:.4f})")
+
 
 def main():
     """Main function to run comprehensive comparison."""
@@ -450,15 +584,34 @@ def main():
     
     parser = argparse.ArgumentParser(description="Comprehensive comparison of dimensionality reduction methods")
     parser.add_argument("--no-optimization", action="store_true", help="Disable aggregation function optimization")
+    parser.add_argument("--biomat", action="store_true", help="Target biomathematics datasets only")
     args = parser.parse_args()
     
     use_optimization = not args.no_optimization
-    comparison = ComprehensiveComparison('./data', use_optimized_aggregation=use_optimization)
-    results = comparison.run_comprehensive_comparison()
+    biomat = args.biomat
+    
+    # Set results directory based on biomat flag
+    if biomat:
+        results_dir = './results/biomat'
+        print("🎯 Biomathematics mode enabled - targeting health, ecology, and social interaction datasets")
+        print(f"📁 Results will be saved to: {results_dir}")
+    else:
+        results_dir = './results'
+    
+    comparison = ComprehensiveComparison('./data', results_dir, use_optimized_aggregation=use_optimization)
+    
+    # Run appropriate comparison based on mode
+    if biomat:
+        results = comparison.run_biomathematics_comparison()
+    else:
+        results = comparison.run_comprehensive_comparison()
     
     if results:
         print(f"\n✅ Comprehensive comparison completed successfully!")
-        print(f"Results for {len(results)} datasets generated.")
+        if biomat:
+            print(f"🧬 Biomathematics results for {len(results)} datasets generated.")
+        else:
+            print(f"Results for {len(results)} datasets generated.")
     else:
         print(f"\n❌ Comprehensive comparison failed or no results generated.")
 
