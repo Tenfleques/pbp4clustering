@@ -26,14 +26,14 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 import numpy as np
-from src.data.loader import DatasetTransformer
+from src.data.consolidated_loader import ConsolidatedDatasetLoader
 
 def main():
     """Main function to demonstrate dataset loading."""
-    transformer = DatasetTransformer()
+    loader = ConsolidatedDatasetLoader()
     
     # Load all datasets
-    datasets = transformer.load_all_datasets()
+    datasets = loader.load_all_datasets()
     
     # Print information about each dataset
     for name, dataset in datasets.items():

@@ -21,6 +21,8 @@ import json
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import glob
+import seaborn as sns
+from src.data.dataset_config import get_core_datasets
 
 def load_dataset_data(dataset_name: str, data_dir: str = "data") -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -609,9 +611,10 @@ def print_analysis_results(results: Dict[str, Any], top_k: int = 10):
 
 def visualize_features(extracted_features: np.ndarray, targets: np.ndarray, 
                       selected_indices: List[int], dataset_name: str, 
-                      save_plot: bool = False, output_file: str = None):
+                      save_plot: bool = False, output_file: str = None,
+                      metadata: Dict[str, Any] = None):
     """
-    Visualize samples using the top features in a scatter plot.
+    Visualize samples using the top features in a scatter plot with dataset information table.
     
     Args:
         extracted_features: Feature matrix with selected features
@@ -620,60 +623,217 @@ def visualize_features(extracted_features: np.ndarray, targets: np.ndarray,
         dataset_name: Name of the dataset
         save_plot: Whether to save the plot
         output_file: Output file path for the plot
+        metadata: Dataset metadata for information table
     """
+    # Ensure targets are numeric and the same length as extracted_features
+    targets = np.asarray(targets)
+    if targets.dtype == object or targets.dtype.type is np.str_:
+        targets = pd.Categorical(targets).codes
+    
+    if len(targets) != extracted_features.shape[0]:
+        print(f"Skipping visualization for {dataset_name}: targets length mismatch ({len(targets)} vs {extracted_features.shape[0]}).")
+        return
+    
     n_features = extracted_features.shape[1]
     
     if n_features == 0:
         print("No features to visualize")
         return
     
-    # Create figure
-    plt.figure(figsize=(10, 8))
+    # Create dataset information table data
+    table_data = []
+    
+    # Basic information
+    table_data.append(['Dataset Name', dataset_name])
+    table_data.append(['Description', metadata.get('description', 'No description available') if metadata else 'No description available'])
+    table_data.append(['Data Type', metadata.get('data_type', 'Unknown') if metadata else 'Unknown'])
+    table_data.append(['Source', metadata.get('source', 'Unknown') if metadata else 'Unknown'])
+    
+    # Shape information
+    table_data.append(['Original Shape', f"{extracted_features.shape[0]} samples × {extracted_features.shape[1]} features"])
+    table_data.append(['Selected Features', f"Features {selected_indices}"])
+    table_data.append(['Total Features', f"{extracted_features.shape[1]}"])
+    
+    # Target information
+    unique_targets = np.unique(targets)
+    table_data.append(['Number of Classes', str(len(unique_targets))])
+    
+    # Create a proper class distribution subtable
+    class_dist = dict(zip(unique_targets, [np.sum(targets == c) for c in unique_targets]))
+    
+    # Create horizontal table format (max 10 classes)
+    max_classes_to_show = 10
+    sorted_classes = sorted(class_dist.items())
+    
+    if len(sorted_classes) <= max_classes_to_show:
+        # Show all classes
+        counts = [str(count) for _, count in sorted_classes]
+        class_dist_text = "Count| " + " | ".join(counts)
+    else:
+        # Show first 10 classes and add ellipsis
+        counts = [str(count) for _, count in sorted_classes[:max_classes_to_show]]
+        class_dist_text = "Count| " + " | ".join(counts) + " | ..."
+    
+    table_data.append(['Class Distribution', class_dist_text])
+    
+    # Feature information
+    if metadata and metadata.get('feature_names'):
+        feature_names = metadata['feature_names']
+        if len(feature_names) <= 5:
+            table_data.append(['Feature Categories', ', '.join(feature_names)])
+        else:
+            table_data.append(['Feature Categories', f"{', '.join(feature_names[:3])}... (+{len(feature_names)-3} more)"])
+    
+    if metadata and metadata.get('measurement_names'):
+        measurement_names = metadata['measurement_names']
+        if len(measurement_names) <= 5:
+            table_data.append(['Measurement Types', ', '.join(measurement_names)])
+        else:
+            table_data.append(['Measurement Types', f"{', '.join(measurement_names[:3])}... (+{len(measurement_names)-3} more)"])
     
     if n_features == 1:
-        # 1D plot
-        plt.scatter(extracted_features[:, 0], np.zeros_like(extracted_features[:, 0]), 
-                   c=targets, cmap='viridis', alpha=0.7)
-        plt.xlabel(f'Feature {selected_indices[0]}')
-        plt.ylabel('Position')
-        plt.title(f'{dataset_name.upper()} - Top Feature Visualization')
+        # 1D plot with dataset info table
+        fig = plt.figure(figsize=(20, 8))
+        
+        # Create subplot grid: 1 row, 3 columns (table, clustering plot, space for legend)
+        gs = fig.add_gridspec(1, 3, width_ratios=[1.2, 1, 0.1])
+        
+        # Dataset information table (left)
+        ax_table = fig.add_subplot(gs[0])
+        # Create the table
+        table = ax_table.table(cellText=table_data, colLabels=['Property', 'Value'], 
+                        cellLoc='left', loc='center', bbox=[0, 0, 1, 1])
+        
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1, 1.8)  # Fixed height for all cells
+        
+        # Color the header
+        for i in range(2):
+            table[(0, i)].set_facecolor('#4CAF50')
+            table[(0, i)].set_text_props(weight='bold', color='white')
+        
+        # Color alternating rows
+        for i in range(1, len(table_data) + 1):
+            for j in range(2):
+                if i % 2 == 0:
+                    table[(i, j)].set_facecolor('#f0f0f0')
+        
+        ax_table.set_title(f'Dataset Information: {dataset_name}', fontsize=12, fontweight='bold', pad=10)
+        
+        # 1D clustering plot (middle)
+        ax_cluster = fig.add_subplot(gs[1])
+        scatter = ax_cluster.scatter(extracted_features[:, 0], np.zeros_like(extracted_features[:, 0]), 
+                                   c=targets, cmap='viridis', alpha=0.7, s=50)
+        ax_cluster.set_xlabel(f'Feature {selected_indices[0]}', fontsize=10)
+        ax_cluster.set_ylabel('Position', fontsize=10)
+        ax_cluster.set_title(f'Top Feature Visualization\n({dataset_name})', fontsize=12, fontweight='bold')
+        
+        # Add colorbar (right)
+        ax_cbar = fig.add_subplot(gs[2])
+        cbar = plt.colorbar(scatter, ax=ax_cbar, shrink=0.8)
+        cbar.set_label('Class', fontsize=10)
+        ax_cbar.axis('off')
         
     elif n_features == 2:
-        # 2D plot
-        plt.scatter(extracted_features[:, 0], extracted_features[:, 1], 
-                   c=targets, cmap='viridis', alpha=0.7)
-        plt.xlabel(f'Feature {selected_indices[0]}')
-        plt.ylabel(f'Feature {selected_indices[1]}')
-        plt.title(f'{dataset_name.upper()} - Top 2 Features Visualization')
+        # 2D plot with dataset info table
+        fig = plt.figure(figsize=(20, 8))
+        
+        # Create subplot grid: 1 row, 3 columns (table, clustering plot, space for legend)
+        gs = fig.add_gridspec(1, 3, width_ratios=[1.2, 1, 0.1])
+        
+        # Dataset information table (left)
+        ax_table = fig.add_subplot(gs[0])
+        # Create the table
+        table = ax_table.table(cellText=table_data, colLabels=['Property', 'Value'], 
+                        cellLoc='left', loc='center', bbox=[0, 0, 1, 1])
+        
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1, 1.8)  # Fixed height for all cells
+        
+        # Color the header
+        for i in range(2):
+            table[(0, i)].set_facecolor('#4CAF50')
+            table[(0, i)].set_text_props(weight='bold', color='white')
+        
+        # Color alternating rows
+        for i in range(1, len(table_data) + 1):
+            for j in range(2):
+                if i % 2 == 0:
+                    table[(i, j)].set_facecolor('#f0f0f0')
+        
+        ax_table.set_title(f'Dataset Information: {dataset_name}', fontsize=12, fontweight='bold', pad=10)
+        
+        # 2D clustering plot (middle)
+        ax_cluster = fig.add_subplot(gs[1])
+        scatter = ax_cluster.scatter(extracted_features[:, 0], extracted_features[:, 1], 
+                                   c=targets, cmap='viridis', alpha=0.7, s=50)
+        ax_cluster.set_xlabel(f'Feature {selected_indices[0]}', fontsize=10)
+        ax_cluster.set_ylabel(f'Feature {selected_indices[1]}', fontsize=10)
+        ax_cluster.set_title(f'Top 2 Features Visualization\n({dataset_name})', fontsize=12, fontweight='bold')
+        
+        # Add colorbar (right)
+        ax_cbar = fig.add_subplot(gs[2])
+        cbar = plt.colorbar(scatter, ax=ax_cbar, shrink=0.8)
+        cbar.set_label('Class', fontsize=10)
+        ax_cbar.axis('off')
         
     elif n_features == 3:
-        # 3D plot
-        fig = plt.figure(figsize=(12, 8))
-        ax = fig.add_subplot(111, projection='3d')
-        scatter = ax.scatter(extracted_features[:, 0], extracted_features[:, 1], extracted_features[:, 2], 
-                           c=targets, cmap='viridis', alpha=0.7)
-        ax.set_xlabel(f'Feature {selected_indices[0]}')
-        ax.set_ylabel(f'Feature {selected_indices[1]}')
-        ax.set_zlabel(f'Feature {selected_indices[2]}')
-        ax.set_title(f'{dataset_name.upper()} - Top 3 Features Visualization')
+        # 3D plot with dataset info table
+        fig = plt.figure(figsize=(20, 8))
         
-        # Add colorbar
-        plt.colorbar(scatter)
-    
-    # Add legend for target classes
-    unique_targets = np.unique(targets)
-    if len(unique_targets) <= 10:  # Only add legend if reasonable number of classes
-        legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
-                                     markerfacecolor=plt.cm.viridis(i/len(unique_targets)), 
-                                     markersize=8, label=f'Class {i}') 
-                          for i in unique_targets]
-        plt.legend(handles=legend_elements, title='Target Classes')
+        # Create subplot grid for 3D: 1 row, 3 columns (table, 3D plot, space for legend)
+        gs = fig.add_gridspec(1, 3, width_ratios=[1.2, 1, 0.1])
+        
+        # Dataset information table (left)
+        ax_table = fig.add_subplot(gs[0])
+        # Create the table
+        table = ax_table.table(cellText=table_data, colLabels=['Property', 'Value'], 
+                        cellLoc='left', loc='center', bbox=[0, 0, 1, 1])
+        
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1, 1.8)  # Fixed height for all cells
+        
+        # Color the header
+        for i in range(2):
+            table[(0, i)].set_facecolor('#4CAF50')
+            table[(0, i)].set_text_props(weight='bold', color='white')
+        
+        # Color alternating rows
+        for i in range(1, len(table_data) + 1):
+            for j in range(2):
+                if i % 2 == 0:
+                    table[(i, j)].set_facecolor('#f0f0f0')
+        
+        ax_table.set_title(f'Dataset Information: {dataset_name}', fontsize=12, fontweight='bold', pad=10)
+        
+        # 3D clustering plot (middle)
+        ax_cluster = fig.add_subplot(gs[1], projection='3d')
+        scatter = ax_cluster.scatter(extracted_features[:, 0], extracted_features[:, 1], extracted_features[:, 2], 
+                                   c=targets, cmap='viridis', alpha=0.7, s=50)
+        ax_cluster.set_xlabel(f'Feature {selected_indices[0]}', fontsize=10)
+        ax_cluster.set_ylabel(f'Feature {selected_indices[1]}', fontsize=10)
+        ax_cluster.set_zlabel(f'Feature {selected_indices[2]}', fontsize=10)
+        ax_cluster.set_title(f'Top 3 Features Visualization (3D)\n({dataset_name})', fontsize=12, fontweight='bold')
+        
+        # Add colorbar (right)
+        ax_cbar = fig.add_subplot(gs[2])
+        cbar = plt.colorbar(scatter, ax=ax_cbar, shrink=0.8)
+        cbar.set_label('Class', fontsize=10)
+        ax_cbar.axis('off')
     
     plt.tight_layout()
     
     if save_plot:
         if output_file is None:
-            output_file = f"{dataset_name}_top_features_visualization.png"
+            output_file = f"results/feature_analysis/{dataset_name}_top_features_visualization.png"
+        elif not output_file.endswith('.png'):
+            output_file = f"{output_file}/{dataset_name}_top_features_visualization.png"
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         print(f"Plot saved to: {output_file}")
     
@@ -689,7 +849,7 @@ def save_results(results: Dict[str, Any], output_file: str = None):
         output_file: Output file path (optional)
     """
     if output_file is None:
-        output_file = f"feature_analysis_{results['dataset_name']}.json"
+        output_file = f"results/feature_analysis/feature_analysis_{results['dataset_name']}.json"
     
     # Convert numpy arrays to lists for JSON serialization
     def convert_numpy(obj):
@@ -751,13 +911,22 @@ def analyze_dataset(dataset_name: str, args: argparse.Namespace):
         features, targets = data_result
         n_features = features.shape[1]
         
+        # Create basic metadata for visualization
+        metadata = {
+            'description': f'Feature analysis for {dataset_name} dataset',
+            'data_type': 'PBP Features',
+            'source': 'Feature Analysis',
+            'feature_names': [f'Feature_{i}' for i in range(n_features)],
+            'measurement_names': [f'Component_{i}' for i in range(n_features)]
+        }
+        
         if n_features <= 3:
             # For 3 or fewer features, use all features
             print(f"Using all {n_features} features for visualization...")
             selected_indices = list(range(n_features))
             extracted_features = features[:, selected_indices]
             visualize_features(extracted_features, targets, selected_indices, 
-                            dataset_name, args.save_plot, args.plot_output)
+                            dataset_name, args.save_plot, args.plot_output, metadata)
             
         elif n_features <= 7:
             # For 4-7 features, use all combinations of 2 and 3 features
@@ -779,7 +948,8 @@ def analyze_dataset(dataset_name: str, args: argparse.Namespace):
                 print(f"\nVisualizing best combination {i+1}/5: features {selected_indices}")
                 visualize_features(extracted_features, targets, selected_indices, 
                                 f"{dataset_name}_best_combo_{i+1}", args.save_plot, 
-                                f"{dataset_name}_best_combo_{i+1}_visualization.png" if args.save_plot else None)
+                                f"{dataset_name}_best_combo_{i+1}_visualization.png" if args.save_plot else None,
+                                metadata)
                 
         else:
             # For more than 7 features, use extract_top_features
@@ -788,7 +958,7 @@ def analyze_dataset(dataset_name: str, args: argparse.Namespace):
             print(f"Selected features: {selected_indices}")
             print(f"Extracted features shape: {extracted_features.shape}")
             visualize_features(extracted_features, targets, selected_indices, 
-                            dataset_name, args.save_plot, args.plot_output)
+                            dataset_name, args.save_plot, args.plot_output, metadata)
 
 def main():
     """Main function to run feature analysis."""
@@ -801,15 +971,16 @@ def main():
     parser.add_argument("--save", action="store_true", help="Save results to JSON file")
     parser.add_argument("--visualize", action="store_true", help="Create visualization of top features")
     parser.add_argument("--save-plot", action="store_true", help="Save visualization plot")
-    parser.add_argument("--plot-output", help="Output file path for the plot (optional)")
+    parser.add_argument("--plot-output", help="Output file path for the plot (optional)", default="results/feature_analysis/")
     
     args = parser.parse_args()
     
+    # Create output directory if it doesn't exist
+    os.makedirs(args.plot_output, exist_ok=True)
+    
     try:
         if args.dataset_name == 'all':
-            datasets = ['iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
-                        'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
-                        'seeds', 'thyroid', 'pima', 'ionosphere']
+            datasets = get_core_datasets()
             for dataset in datasets:
                 print(f"Analyzing dataset: {dataset}")
                 analyze_dataset(dataset, args)

@@ -41,8 +41,7 @@ except ImportError:
     print("Warning: Aggregation optimization not available. Using default sum aggregation.")
     AGGREGATION_OPTIMIZATION_AVAILABLE = False
 
-# Import the centralized DatasetTransformer
-from ..data.loader import DatasetTransformer
+from ..data.dataset_config import get_testing_datasets
 
 class DatasetTester:
     """Test datasets with pbp_vector approach."""
@@ -51,7 +50,6 @@ class DatasetTester:
         self.data_dir = data_dir
         self.results_dir = results_dir
         self.results = {}
-        self.transformer = DatasetTransformer()
         self.use_optimized_aggregation = use_optimized_aggregation and AGGREGATION_OPTIMIZATION_AVAILABLE
         self.aggregation_optimizer = None
         self.optimal_aggregation_functions = {}
@@ -63,25 +61,31 @@ class DatasetTester:
             print("⚠ Using default sum aggregation")
         
     def load_dataset(self, dataset_name):
-        """Load dataset using the centralized DatasetTransformer."""
+        """Load dataset using the centralized ConsolidatedDatasetLoader."""
         print(f"Loading {dataset_name} using centralized loader...")
         
-        # Use the DatasetTransformer to load datasets
-        dataset_obj = self.transformer.load_dataset(dataset_name)
-        
-        if dataset_obj is None:
-            print(f"Failed to load dataset: {dataset_name}")
-            return None
+        # Use the ConsolidatedDatasetLoader to load datasets
+        try:
+            from ..data.consolidated_loader import ConsolidatedDatasetLoader
+            loader = ConsolidatedDatasetLoader()
+            dataset_obj = loader.load_dataset(dataset_name)
             
-        return {
-            'X': dataset_obj['X'],
-            'y': dataset_obj['y'],
-            'metadata': {
-                'feature_names': dataset_obj.get('feature_names', []),
-                'measurement_names': dataset_obj.get('measurement_names', []),
-                'description': dataset_obj.get('description', f'{dataset_name} dataset')
+            if dataset_obj is None:
+                print(f"Failed to load dataset: {dataset_name}")
+                return None
+                
+            return {
+                'X': dataset_obj['X'],
+                'y': dataset_obj['y'],
+                'metadata': {
+                    'feature_names': dataset_obj.get('feature_names', []),
+                    'measurement_names': dataset_obj.get('measurement_names', []),
+                    'description': dataset_obj.get('description', f'{dataset_name} dataset')
+                }
             }
-        }
+        except Exception as e:
+            print(f"Error loading dataset {dataset_name}: {e}")
+            return None
     
     def get_optimal_aggregation_function(self, dataset_name, dataset):
         """Get the optimal aggregation function for a dataset."""
@@ -238,8 +242,176 @@ class DatasetTester:
         
         return component_names
     
+    def select_informative_columns(self, X_reduced, y_labels, n_components=2):
+        """
+        Select the most informative columns for visualization.
+        
+        Args:
+            X_reduced: Reduced feature matrix
+            y_labels: Cluster labels
+            n_components: Number of components to select
+            
+        Returns:
+            tuple: (selected_indices, X_selected, component_names)
+        """
+        if X_reduced.shape[1] <= n_components:
+            # If we have fewer columns than needed, use all
+            return np.arange(X_reduced.shape[1]), X_reduced, None
+        
+        # Calculate informativeness scores for each column
+        informativeness_scores = []
+        
+        for col in range(X_reduced.shape[1]):
+            col_data = X_reduced[:, col]
+            
+            # Calculate overall variance
+            overall_variance = np.var(col_data)
+            
+            # Calculate within-cluster variance
+            within_cluster_variances = []
+            for cluster_id in np.unique(y_labels):
+                cluster_mask = y_labels == cluster_id
+                if np.sum(cluster_mask) > 1:  # Need at least 2 points for variance
+                    cluster_variance = np.var(col_data[cluster_mask])
+                    within_cluster_variances.append(cluster_variance)
+            
+            # Calculate between-cluster variance
+            cluster_means = []
+            for cluster_id in np.unique(y_labels):
+                cluster_mask = y_labels == cluster_id
+                cluster_mean = np.mean(col_data[cluster_mask])
+                cluster_means.append(cluster_mean)
+            between_cluster_variance = np.var(cluster_means) if len(cluster_means) > 1 else 0
+            
+            # Calculate informativeness score
+            # Higher score = more informative (high overall variance, low within-cluster variance, high between-cluster variance)
+            if overall_variance > 0:
+                within_variance = np.mean(within_cluster_variances) if within_cluster_variances else 0
+                informativeness_score = (between_cluster_variance / (within_variance + 1e-8)) * overall_variance
+            else:
+                informativeness_score = 0
+            
+            informativeness_scores.append(informativeness_score)
+        
+        # Select top n_components columns
+        top_indices = np.argsort(informativeness_scores)[::-1][:n_components]
+        
+        # Ensure we have at least 2 different columns for 2D plots
+        if len(top_indices) < 2:
+            # If we don't have enough informative columns, add the next best ones
+            remaining_indices = np.setdiff1d(np.arange(X_reduced.shape[1]), top_indices)
+            if len(remaining_indices) > 0:
+                additional_needed = 2 - len(top_indices)
+                additional_indices = remaining_indices[:additional_needed]
+                top_indices = np.concatenate([top_indices, additional_indices])
+        
+        # Sort indices to maintain order
+        top_indices = np.sort(top_indices)
+        
+        # Ensure we don't exceed the number of available columns
+        top_indices = top_indices[:min(n_components, X_reduced.shape[1])]
+        
+        return top_indices, X_reduced[:, top_indices], None
+    
+    def create_dataset_info_table(self, dataset_name, metadata, X_shape, y_unique):
+        """
+        Create a comprehensive dataset information table.
+        
+        Args:
+            dataset_name: Name of the dataset
+            metadata: Dataset metadata
+            X_shape: Shape of the feature matrix
+            y_unique: Unique target values
+            
+        Returns:
+            matplotlib figure with dataset information table
+        """
+        # Get additional dataset information from dataset_info.py if available
+        try:
+            from src.data.dataset_info import get_dataset_info
+            dataset_info = get_dataset_info(dataset_name)
+        except ImportError:
+            dataset_info = None
+        
+        # Prepare table data
+        table_data = []
+        
+        # Basic information
+        table_data.append(['Dataset Name', dataset_name])
+        table_data.append(['Description', metadata.get('description', 'No description available')])
+        table_data.append(['Data Type', metadata.get('data_type', 'Unknown')])
+        table_data.append(['Source', metadata.get('source', 'Unknown')])
+        
+        # Shape information
+        table_data.append(['Original Shape', f"{X_shape[0]} samples × {X_shape[1]}×{X_shape[2]} matrices"])
+        table_data.append(['Matrix Structure', f"{X_shape[1]} rows × {X_shape[2]} columns"])
+        table_data.append(['Total Features', f"{X_shape[1] * X_shape[2]}"])
+        
+        # Target information
+        table_data.append(['Number of Classes', str(len(y_unique))])
+        table_data.append(['Class Distribution', f"{dict(zip(y_unique, [np.sum(y_unique == c) for c in y_unique]))}"])
+        
+        # Feature information
+        if metadata.get('feature_names'):
+            feature_names = metadata['feature_names']
+            if len(feature_names) <= 5:
+                table_data.append(['Feature Categories', ', '.join(feature_names)])
+            else:
+                table_data.append(['Feature Categories', f"{', '.join(feature_names[:3])}... (+{len(feature_names)-3} more)"])
+        
+        if metadata.get('measurement_names'):
+            measurement_names = metadata['measurement_names']
+            if len(measurement_names) <= 5:
+                table_data.append(['Measurement Types', ', '.join(measurement_names)])
+            else:
+                table_data.append(['Measurement Types', f"{', '.join(measurement_names[:3])}... (+{len(measurement_names)-3} more)"])
+        
+        # PBP transformation information
+        if dataset_info and 'pbp_transformation' in dataset_info:
+            pbp_info = dataset_info['pbp_transformation']
+            table_data.append(['PBP Matrix Shape', pbp_info.get('matrix_shape', 'Unknown')])
+            table_data.append(['PBP Rationale', pbp_info.get('rationale', 'Unknown')])
+        
+        # Domain and application information
+        if dataset_info:
+            table_data.append(['Domain', dataset_info.get('domain', 'Unknown')])
+            table_data.append(['Sample Count', str(dataset_info.get('sample_count', 'Unknown'))])
+        
+        # Create the table
+        fig, ax = plt.subplots(figsize=(12, len(table_data) * 0.4 + 2))
+        ax.axis('tight')
+        ax.axis('off')
+        
+        # Create table
+        table = ax.table(cellText=table_data, 
+                        colLabels=['Property', 'Value'],
+                        cellLoc='left',
+                        loc='center',
+                        colWidths=[0.3, 0.7])
+        
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.scale(1, 2)
+        
+        # Color the header
+        for i in range(2):
+            table[(0, i)].set_facecolor('#4CAF50')
+            table[(0, i)].set_text_props(weight='bold', color='white')
+        
+        # Color alternating rows
+        for i in range(1, len(table_data) + 1):
+            for j in range(2):
+                if i % 2 == 0:
+                    table[(i, j)].set_facecolor('#f0f0f0')
+        
+        # Set title
+        plt.title(f'Dataset Information: {dataset_name}', fontsize=14, fontweight='bold', pad=20)
+        
+        return fig
+    
     def visualize_results(self, X_reduced, y_true, y_pred, dataset_name, metadata, method_label="PBP"):
-        """Visualize clustering results."""
+        """Visualize clustering results with dataset information table and informative column selection."""
         # Ensure y_true and y_pred are numeric and the same length as X_reduced
         y_true = np.asarray(y_true)
         y_pred = np.asarray(y_pred)
@@ -247,88 +419,208 @@ class DatasetTester:
             y_true = pd.Categorical(y_true).codes
         if y_pred.dtype == object or y_pred.dtype.type is np.str_:
             y_pred = pd.Categorical(y_pred).codes
-        if len(y_true) != X_reduced.shape[0]:
-            print(f"Skipping visualization for {dataset_name}: y_true length mismatch.")
+        
+        # Ensure X_reduced is 2D for visualization
+        if len(X_reduced.shape) == 3:
+            # If X_reduced is 3D, flatten it for visualization
+            X_flat = X_reduced.reshape(X_reduced.shape[0], -1)
+        else:
+            X_flat = X_reduced
+            
+        if len(y_true) != X_flat.shape[0]:
+            print(f"Skipping visualization for {dataset_name}: y_true length mismatch ({len(y_true)} vs {X_flat.shape[0]}).")
             return
-        if len(y_pred) != X_reduced.shape[0]:
-            print(f"Skipping visualization for {dataset_name}: y_pred length mismatch.")
+        if len(y_pred) != X_flat.shape[0]:
+            print(f"Skipping visualization for {dataset_name}: y_pred length mismatch ({len(y_pred)} vs {X_flat.shape[0]}).")
             return
 
         # Generate PBP component names if this is a PBP method
         if "PBP" in method_label:
             # Estimate original matrix dimensions from the method label or metadata
             # For now, we'll use a reasonable default based on the reduced shape
-            estimated_rows = min(3, X_reduced.shape[1])  # Conservative estimate
-            pbp_component_names = self.get_pbp_component_names(X_reduced.shape[1], estimated_rows)
+            estimated_rows = min(3, X_flat.shape[1])  # Conservative estimate
+            pbp_component_names = self.get_pbp_component_names(X_flat.shape[1], estimated_rows)
         else:
             pbp_component_names = None
 
-        fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-        scatter1 = axes[0].scatter(X_reduced[:, 0], X_reduced[:, 1], c=y_true, cmap='viridis', alpha=0.7)
-        axes[0].set_title(f'{dataset_name} - True Labels\n({method_label})')
+        # Select informative columns for 2D visualization
+        informative_indices_2d, X_2d, _ = self.select_informative_columns(X_flat, y_pred, n_components=2)
         
-        # Use PBP component names if available, otherwise fallback to generic names
-        if pbp_component_names and len(pbp_component_names) >= 2:
-            axes[0].set_xlabel(pbp_component_names[0])
-            axes[0].set_ylabel(pbp_component_names[1])
+        # Create 2D visualization with dataset info table
+        fig = plt.figure(figsize=(20, 8))
+        
+        # Create subplot grid: 1 row, 3 columns (table, clustering plot, space for legend)
+        gs = fig.add_gridspec(1, 3, width_ratios=[1.2, 1, 0.1])
+        
+        # Dataset information table (left)
+        ax_table = fig.add_subplot(gs[0])
+        
+        # Create table data directly instead of copying from another figure
+        table_data = []
+        
+        # Basic information
+        table_data.append(['Dataset Name', dataset_name])
+        table_data.append(['Description', metadata.get('description', 'No description available')])
+        table_data.append(['Data Type', metadata.get('data_type', 'Unknown')])
+        table_data.append(['Source', metadata.get('source', 'Unknown')])
+        
+        # Shape information
+        table_data.append(['Original Shape', f"{X_flat.shape[0]} samples × {X_flat.shape[1]} features"])
+        table_data.append(['Reduced Shape', f"{X_2d.shape[1]} components"])
+        table_data.append(['Total Features', f"{X_flat.shape[1]}"])
+        
+        # Target information
+        unique_classes = np.unique(y_true)
+        table_data.append(['Number of Classes', str(len(unique_classes))])
+        
+        # Create a proper class distribution subtable
+        class_dist = dict(zip(unique_classes, [np.sum(y_true == c) for c in unique_classes]))
+        
+        # Create horizontal table format (max 10 classes)
+        max_classes_to_show = 10
+        sorted_classes = sorted(class_dist.items())
+        
+        if len(sorted_classes) <= max_classes_to_show:
+            # Show all classes
+            counts = [str(count) for _, count in sorted_classes]
+            class_dist_text = "Count| " + " | ".join(counts)
         else:
-            axes[0].set_xlabel('Component 1')
-            axes[0].set_ylabel('Component 2')
-        plt.colorbar(scatter1, ax=axes[0])
+            # Show first 10 classes and add ellipsis
+            counts = [str(count) for _, count in sorted_classes[:max_classes_to_show]]
+            class_dist_text = "Count| " + " | ".join(counts) + " | ..."
+        
+        table_data.append(['Class Distribution', class_dist_text])
+        
+        # Feature information
+        if metadata.get('feature_names'):
+            feature_names = metadata['feature_names']
+            if len(feature_names) <= 5:
+                table_data.append(['Feature Categories', ', '.join(feature_names)])
+            else:
+                table_data.append(['Feature Categories', f"{', '.join(feature_names[:3])}... (+{len(feature_names)-3} more)"])
+        
+        if metadata.get('measurement_names'):
+            measurement_names = metadata['measurement_names']
+            if len(measurement_names) <= 5:
+                table_data.append(['Measurement Types', ', '.join(measurement_names)])
+            else:
+                table_data.append(['Measurement Types', f"{', '.join(measurement_names[:3])}... (+{len(measurement_names)-3} more)"])
+        
+        # Create the table
+        ax_table.axis('off')
+        table = ax_table.table(cellText=table_data, 
+                              colLabels=['Property', 'Value'],
+                              cellLoc='left',
+                              loc='center',
+                              colWidths=[0.3, 0.7])
+        
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1, 1.8) # Fixed scaling for class distribution
+        
+        # Color the header
+        for i in range(2):
+            table[(0, i)].set_facecolor('#4CAF50')
+            table[(0, i)].set_text_props(weight='bold', color='white')
+        
+        # Color alternating rows
+        for i in range(1, len(table_data) + 1):
+            for j in range(2):
+                if i % 2 == 0:
+                    table[(i, j)].set_facecolor('#f0f0f0')
+        
 
-        scatter2 = axes[1].scatter(X_reduced[:, 0], X_reduced[:, 1], c=y_pred, cmap='viridis', alpha=0.7)
-        axes[1].set_title(f'{dataset_name} - Predicted Clusters\n({method_label})')
+
+        ax_table.set_title(f'Dataset Information: {dataset_name}', fontsize=12, fontweight='bold', pad=10)
+
+        # Clustering plot (middle)
+        ax_cluster = fig.add_subplot(gs[1])
+        scatter = ax_cluster.scatter(X_2d[:, 0], X_2d[:, 1], c=y_pred, cmap='viridis', alpha=0.7, s=50)
+        ax_cluster.set_title(f'Predicted Clusters\n({method_label})', fontsize=12, fontweight='bold')
         
-        # Use PBP component names if available, otherwise fallback to generic names
-        if pbp_component_names and len(pbp_component_names) >= 2:
-            axes[1].set_xlabel(pbp_component_names[0])
-            axes[1].set_ylabel(pbp_component_names[1])
+        # Use PBP component names if available, otherwise use informative column indices
+        if pbp_component_names and len(pbp_component_names) >= max(informative_indices_2d) + 1:
+            ax_cluster.set_xlabel(pbp_component_names[informative_indices_2d[0]], fontsize=10)
+            ax_cluster.set_ylabel(pbp_component_names[informative_indices_2d[1]], fontsize=10)
         else:
-            axes[1].set_xlabel('Component 1')
-            axes[1].set_ylabel('Component 2')
-        plt.colorbar(scatter2, ax=axes[1])
+            ax_cluster.set_xlabel(f'Component {informative_indices_2d[0] + 1}', fontsize=10)
+            ax_cluster.set_ylabel(f'Component {informative_indices_2d[1] + 1}', fontsize=10)
+        
+        # Add colorbar (right)
+        ax_cbar = fig.add_subplot(gs[2])
+        cbar = plt.colorbar(scatter, ax=ax_cbar, shrink=0.8)
+        cbar.set_label('Cluster', fontsize=10)
+        ax_cbar.axis('off')
 
         plt.tight_layout()
         plt.savefig(f"{self.results_dir}/figures/{dataset_name}_clustering_{method_label.replace(' ', '_')}.png", dpi=300, bbox_inches='tight')
-        # plt.show()
+        plt.close()
         
         # 3D visualization if we have 3+ components
-        if X_reduced.shape[1] >= 3:
-            fig = plt.figure(figsize=(15, 6))
+        if X_flat.shape[1] >= 3:
+            # Select informative columns for 3D visualization
+            informative_indices_3d, X_3d, _ = self.select_informative_columns(X_flat, y_pred, n_components=3)
             
-            ax1 = fig.add_subplot(121, projection='3d')
-            scatter1 = ax1.scatter(X_reduced[:, 0], X_reduced[:, 1], X_reduced[:, 2], 
-                                  c=y_true, cmap='viridis', alpha=0.7)
-            ax1.set_title(f'{dataset_name} - True Labels (3D)')
+            fig = plt.figure(figsize=(20, 8))
             
-            # Use PBP component names if available, otherwise fallback to generic names
-            if pbp_component_names and len(pbp_component_names) >= 3:
-                ax1.set_xlabel(pbp_component_names[0])
-                ax1.set_ylabel(pbp_component_names[1])
-                ax1.set_zlabel(pbp_component_names[2])
+            # Create subplot grid for 3D: 1 row, 3 columns (table, 3D plot, space for legend)
+            gs = fig.add_gridspec(1, 3, width_ratios=[1.2, 1, 0.1])
+            
+            # Dataset information table (left) - reuse the same table data
+            ax_table = fig.add_subplot(gs[0])
+            ax_table.axis('off')
+            table = ax_table.table(cellText=table_data, 
+                                  colLabels=['Property', 'Value'],
+                                  cellLoc='left',
+                                  loc='center',
+                                  colWidths=[0.3, 0.7])
+            
+            # Style the table
+            table.auto_set_font_size(False)
+            table.set_fontsize(9)
+            table.scale(1, 1.8) # Fixed scaling for class distribution
+            
+            # Color the header
+            for i in range(2):
+                table[(0, i)].set_facecolor('#4CAF50')
+                table[(0, i)].set_text_props(weight='bold', color='white')
+            
+            # Color alternating rows
+            for i in range(1, len(table_data) + 1):
+                for j in range(2):
+                    if i % 2 == 0:
+                        table[(i, j)].set_facecolor('#f0f0f0')
+            
+            
+            
+            ax_table.set_title(f'Dataset Information: {dataset_name}', fontsize=12, fontweight='bold', pad=10)
+            
+            # 3D clustering plot (middle)
+            ax_cluster = fig.add_subplot(gs[1], projection='3d')
+            scatter = ax_cluster.scatter(X_3d[:, 0], X_3d[:, 1], X_3d[:, 2], 
+                                       c=y_pred, cmap='viridis', alpha=0.7, s=50)
+            ax_cluster.set_title(f'Predicted Clusters (3D)\n({method_label})', fontsize=12, fontweight='bold')
+            
+            # Use PBP component names if available, otherwise use informative column indices
+            if pbp_component_names and len(pbp_component_names) >= max(informative_indices_3d) + 1:
+                ax_cluster.set_xlabel(pbp_component_names[informative_indices_3d[0]], fontsize=10)
+                ax_cluster.set_ylabel(pbp_component_names[informative_indices_3d[1]], fontsize=10)
+                ax_cluster.set_zlabel(pbp_component_names[informative_indices_3d[2]], fontsize=10)
             else:
-                ax1.set_xlabel('Component 1')
-                ax1.set_ylabel('Component 2')
-                ax1.set_zlabel('Component 3')
+                ax_cluster.set_xlabel(f'Component {informative_indices_3d[0] + 1}', fontsize=10)
+                ax_cluster.set_ylabel(f'Component {informative_indices_3d[1] + 1}', fontsize=10)
+                ax_cluster.set_zlabel(f'Component {informative_indices_3d[2] + 1}', fontsize=10)
             
-            ax2 = fig.add_subplot(122, projection='3d')
-            scatter2 = ax2.scatter(X_reduced[:, 0], X_reduced[:, 1], X_reduced[:, 2], 
-                                  c=y_pred, cmap='viridis', alpha=0.7)
-            ax2.set_title(f'{dataset_name} - Predicted Clusters (3D)')
-            
-            # Use PBP component names if available, otherwise fallback to generic names
-            if pbp_component_names and len(pbp_component_names) >= 3:
-                ax2.set_xlabel(pbp_component_names[0])
-                ax2.set_ylabel(pbp_component_names[1])
-                ax2.set_zlabel(pbp_component_names[2])
-            else:
-                ax2.set_xlabel('Component 1')
-                ax2.set_ylabel('Component 2')
-                ax2.set_zlabel('Component 3')
+            # Add colorbar (right)
+            ax_cbar = fig.add_subplot(gs[2])
+            cbar = plt.colorbar(scatter, ax=ax_cbar, shrink=0.8)
+            cbar.set_label('Cluster', fontsize=10)
+            ax_cbar.axis('off')
             
             plt.tight_layout()
             plt.savefig(f"{self.results_dir}/figures/{dataset_name}_clustering_3d_{method_label.replace(' ', '_')}.png", dpi=300, bbox_inches='tight')
-            # plt.show()
+            plt.close()
     
     def test_dataset(self, dataset_name):
         """Test a specific dataset with the pbp_vector approach."""
@@ -336,7 +628,7 @@ class DatasetTester:
         print(f"Testing dataset: {dataset_name}")
         print(f"{'='*50}")
         
-        # Load dataset using the centralized DatasetTransformer
+        # Load dataset using the centralized ConsolidatedDatasetLoader
         dataset = self.load_dataset(dataset_name)
         if dataset is None:
             return None
@@ -403,12 +695,7 @@ class DatasetTester:
         except Exception as e:
             print(f"Error getting dataset configuration: {e}")
             # Fallback to a subset of datasets
-            all_datasets = [
-                'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
-                'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
-                'seeds', 'thyroid', 'pima', 'ionosphere', 'spectf',
-                'glass_conforming', 'covertype', 'kddcup99', 'linnerrud', 'species_distribution'
-            ]
+            all_datasets = get_testing_datasets()
             print(f"Using fallback dataset list: {len(all_datasets)} datasets")
         
         results = {}

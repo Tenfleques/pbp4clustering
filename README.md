@@ -53,7 +53,7 @@ This repository contains the implementation and analysis of the Pseudo-Boolean P
 - `pbp_vector()`: Create PBP vector representation
 - `create_pbp()`: Create full PBP polynomial representation
 - `truncate_pBp()`: Truncate PBP polynomials
-- `DatasetTransformer`: Load and transform datasets
+- `ConsolidatedDatasetLoader`: Load and transform datasets with comprehensive coverage
 
 ### **Dataset Characteristics**
 The method has been tested on 10 diverse datasets with varying characteristics:
@@ -68,11 +68,11 @@ The method has been tested on 10 diverse datasets with varying characteristics:
 
 ```python
 from src.pbp.core import pbp_vector, create_pbp
-from src.data.loader import DatasetTransformer
+from src.data.consolidated_loader import ConsolidatedDatasetLoader
 
 # Load dataset
-transformer = DatasetTransformer()
-iris_data = transformer.load_iris_dataset()
+loader = ConsolidatedDatasetLoader()
+iris_data = loader.load_dataset('iris')
 X = iris_data['X']
 
 # Apply PBP transformation to a sample
@@ -209,7 +209,7 @@ pbp4clustering/
 ### Adding New Datasets
 
 1. Add dataset loading function to `src/data/loader.py`
-2. Update the `DatasetTransformer` class
+2. Update the `ConsolidatedDatasetLoader` class
 3. Add dataset to the available datasets list
 
 ### Code Style

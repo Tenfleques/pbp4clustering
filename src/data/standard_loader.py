@@ -26,7 +26,10 @@ class StandardDatasetLoader(BaseDatasetLoader):
             'breast_cancer': load_breast_cancer,
             'wine': load_wine,
             'digits': load_digits,
-            'diabetes': load_diabetes
+            'diabetes': load_diabetes,
+            'breast_cancer_sklearn': load_breast_cancer,
+            'digits_sklearn': load_digits,
+            'wine_sklearn': load_wine
         }
     
     def load_dataset(self, dataset_name):

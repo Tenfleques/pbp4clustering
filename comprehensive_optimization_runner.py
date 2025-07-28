@@ -16,8 +16,9 @@ import logging
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.data.loader import DatasetTransformer
+from src.data.consolidated_loader import ConsolidatedDatasetLoader
 from src.analysis.comprehensive_optimization import ComprehensiveOptimizer, optimize_all_datasets
+from src.data.dataset_config import get_optimization_datasets
 
 # Configure logging
 logging.basicConfig(
@@ -39,20 +40,16 @@ def load_all_datasets_for_optimization():
     """
     logger.info("Loading all datasets for comprehensive optimization...")
     
-    dt = DatasetTransformer()
+    loader = ConsolidatedDatasetLoader()
     datasets = {}
     
-    # List of datasets to optimize
-    dataset_names = [
-        'iris', 'breast_cancer', 'wine', 'digits', 'diabetes', 'sonar',
-        'glass', 'vehicle', 'ecoli', 'yeast', 'seeds', 'thyroid', 
-        'ionosphere', 'covertype', 'kddcup99'
-    ]
+    # Get datasets from centralized configuration
+    dataset_names = get_optimization_datasets()
     
     for dataset_name in dataset_names:
         try:
             logger.info(f"Loading dataset: {dataset_name}")
-            dataset_data = dt.load_dataset(dataset_name)
+            dataset_data = loader.load_dataset(dataset_name)
             
             if dataset_data is not None:
                 # Prepare data for optimization

@@ -6,12 +6,17 @@ This script runs all possible instances for both measurement_exclusion_compariso
 and comprehensive_comparison.py with support for dataset selection.
 """
 
-import subprocess
 import sys
 import os
+import subprocess
 import argparse
-import time
 from datetime import datetime
+import time
+
+# Add src to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
+from src.data.dataset_config import get_core_datasets
 
 def run_command(cmd, description):
     """Run a command and handle errors gracefully."""
@@ -185,7 +190,7 @@ def run_all_analyses(dataset=None, max_drop=None, comprehensive_only=False, excl
             success = run_measurement_exclusion_analysis(dataset, max_drop)
         else:
             # Run for all datasets
-            datasets = ['iris', 'breast_cancer', 'wine', 'digits', 'diabetes', 'sonar', 'glass', 'vehicle', 'ecoli', 'yeast']
+            datasets = get_core_datasets()
             success = True
             for ds in datasets:
                 if not run_measurement_exclusion_analysis(ds, max_drop):

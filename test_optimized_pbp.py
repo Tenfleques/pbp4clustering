@@ -24,6 +24,7 @@ from src.pbp.aggregation_functions import get_aggregation_function
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, davies_bouldin_score
 from sklearn.preprocessing import StandardScaler
+from src.data.dataset_config import get_core_datasets
 
 
 class OptimizedPBPComparison:
@@ -218,10 +219,7 @@ class OptimizedPBPComparison:
         print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         # Test datasets
-        test_datasets = [
-            'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
-            'sonar', 'glass', 'seeds', 'thyroid', 'pima'
-        ]
+        test_datasets = get_core_datasets()
         
         all_results = {}
         

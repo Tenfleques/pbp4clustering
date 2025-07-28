@@ -17,16 +17,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 
 from src.pbp.core import pbp_vector, create_pbp, truncate_pBp
-from src.data.loader import DatasetTransformer
+from src.data.consolidated_loader import ConsolidatedDatasetLoader
 
 
 def basic_example():
     """Basic PBP usage example."""
     print("=== Basic PBP Example ===")
     
-    # Load dataset using the DatasetTransformer
-    transformer = DatasetTransformer()
-    iris_data = transformer.load_iris_dataset()
+    # Load dataset using the ConsolidatedDatasetLoader
+    loader = ConsolidatedDatasetLoader()
+    iris_data = loader.load_dataset('iris')
     
     if iris_data is None:
         print("Failed to load iris dataset")
@@ -67,8 +67,8 @@ def comparison_example():
     print("\n=== Method Comparison Example ===")
     
     # Load dataset
-    transformer = DatasetTransformer()
-    iris_data = transformer.load_iris_dataset()
+    loader = ConsolidatedDatasetLoader()
+    iris_data = loader.load_dataset('iris')
     
     if iris_data is None:
         print("Failed to load iris dataset")
@@ -113,8 +113,8 @@ def clustering_example():
     print("\n=== Clustering Example ===")
     
     # Load dataset
-    transformer = DatasetTransformer()
-    iris_data = transformer.load_iris_dataset()
+    loader = ConsolidatedDatasetLoader()
+    iris_data = loader.load_dataset('iris')
     
     if iris_data is None:
         print("Failed to load iris dataset")
@@ -190,8 +190,8 @@ def visualization_example():
     print("\n=== Visualization Example ===")
     
     # Load dataset
-    transformer = DatasetTransformer()
-    iris_data = transformer.load_iris_dataset()
+    loader = ConsolidatedDatasetLoader()
+    iris_data = loader.load_dataset('iris')
     
     if iris_data is None:
         print("Failed to load iris dataset")

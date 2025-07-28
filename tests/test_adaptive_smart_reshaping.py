@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 from sklearn.cluster import KMeans
-from src.data.loader import DatasetTransformer
+from src.data.consolidated_loader import ConsolidatedDatasetLoader
 
 def test_adaptive_approach(dataset_name):
     """
@@ -27,8 +27,8 @@ def test_adaptive_approach(dataset_name):
     print(f"{'='*80}")
     
     # Load dataset
-    dt = DatasetTransformer()
-    dataset = dt.load_dataset(dataset_name)
+    loader = ConsolidatedDatasetLoader()
+    dataset = loader.load_dataset(dataset_name)
     
     if dataset is None:
         print(f"Failed to load {dataset_name} dataset")
@@ -87,12 +87,12 @@ def compare_strategies_manually(dataset_name):
     print(f"MANUAL STRATEGY COMPARISON: {dataset_name.upper()}")
     print(f"{'='*80}")
     
-    dt = DatasetTransformer()
+    loader = ConsolidatedDatasetLoader()
     
     # Load original data
     if dataset_name == 'glass':
         url = "https://archive.ics.uci.edu/ml/machine-learning-databases/glass/glass.data"
-        X, y, columns = dt.download_uci_dataset("Glass", url)
+        X, y, columns = loader.download_uci_dataset("Glass", url)
     elif dataset_name == 'vehicle':
         # For vehicle, we'll use synthetic data for comparison
         X = np.random.randn(100, 18)
@@ -194,8 +194,8 @@ def visualize_adaptive_results(dataset_name):
     Args:
         dataset_name: Name of the dataset to visualize
     """
-    dt = DatasetTransformer()
-    dataset = dt.load_dataset(dataset_name)
+    loader = ConsolidatedDatasetLoader()
+    dataset = loader.load_dataset(dataset_name)
     
     if dataset is None or 'evaluation_metrics' not in dataset:
         print(f"Cannot visualize adaptive results for {dataset_name}")

@@ -21,12 +21,12 @@ import sys
 import json
 import logging
 from tqdm import tqdm
+from ..data.dataset_config import get_all_datasets
 logging.getLogger('matplotlib.font_manager').disabled = True
 
 # Import PBP modules
 try:
     from ..pbp.core import pbp_vector
-    from ..data.loader import DatasetTransformer
     PBP_AVAILABLE = True
 except ImportError:
     print("Warning: pbp modules not found. Using PCA as fallback.")
@@ -51,7 +51,6 @@ class ComprehensiveComparison:
         self.results_dir = results_dir
         self.results = {}
         self.feature_selection_results = {}
-        self.transformer = DatasetTransformer()
         self.use_optimized_aggregation = use_optimized_aggregation and AGGREGATION_OPTIMIZATION_AVAILABLE
         self.aggregation_optimizer = None
         self.optimal_aggregation_functions = {}
@@ -63,25 +62,31 @@ class ComprehensiveComparison:
             print("⚠ Using default sum aggregation for PBP")
         
     def load_dataset(self, dataset_name):
-        """Load dataset using the centralized DatasetTransformer."""
+        """Load dataset using the centralized ConsolidatedDatasetLoader."""
         print(f"Loading {dataset_name}...")
         
-        # Use the DatasetTransformer to load datasets
-        dataset_obj = self.transformer.load_dataset(dataset_name)
-        
-        if dataset_obj is None:
-            print(f"Failed to load dataset: {dataset_name}")
-            return None
+        # Use the ConsolidatedDatasetLoader to load datasets
+        try:
+            from ..data.consolidated_loader import ConsolidatedDatasetLoader
+            loader = ConsolidatedDatasetLoader()
+            dataset_obj = loader.load_dataset(dataset_name)
             
-        return {
-            'X': dataset_obj['X'],
-            'y': dataset_obj['y'],
-            'metadata': {
-                'feature_names': dataset_obj.get('feature_names', []),
-                'measurement_names': dataset_obj.get('measurement_names', []),
-                'description': dataset_obj.get('description', f'{dataset_name} dataset')
+            if dataset_obj is None:
+                print(f"Failed to load dataset: {dataset_name}")
+                return None
+                
+            return {
+                'X': dataset_obj['X'],
+                'y': dataset_obj['y'],
+                'metadata': {
+                    'feature_names': dataset_obj.get('feature_names', []),
+                    'measurement_names': dataset_obj.get('measurement_names', []),
+                    'description': dataset_obj.get('description', f'{dataset_name} dataset')
+                }
             }
-        }
+        except Exception as e:
+            print(f"Error loading dataset {dataset_name}: {e}")
+            return None
     
     def get_optimal_aggregation_function(self, dataset_name, dataset):
         """Get the optimal aggregation function for a dataset."""
@@ -362,12 +367,7 @@ class ComprehensiveComparison:
         except Exception as e:
             print(f"Error getting dataset configuration: {e}")
             # Fallback to a subset of datasets
-            all_datasets = [
-                'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
-                'sonar', 'glass', 'vehicle', 'ecoli', 'yeast',
-                'seeds', 'thyroid', 'pima', 'ionosphere', 'spectf',
-                'glass_conforming', 'covertype', 'kddcup99', 'linnerrud', 'species_distribution'
-            ]
+            all_datasets = get_all_datasets()
             print(f"Using fallback dataset list: {len(all_datasets)} datasets")
         
         all_results = {}

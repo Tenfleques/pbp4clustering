@@ -19,6 +19,7 @@ from .advanced_aids_loader import AdvancedAIDSLoader
 from .advanced_genetic_loader import AdvancedGeneticLoader
 from .advanced_medical_loader import AdvancedMedicalLoader
 from .advanced_nci_loader import AdvancedNCILoader
+from .business_loader import BusinessDatasetLoader
 
 class ConsolidatedDatasetLoader(BaseDatasetLoader):
     """
@@ -41,7 +42,8 @@ class ConsolidatedDatasetLoader(BaseDatasetLoader):
             'advanced_aids': AdvancedAIDSLoader(data_dir),
             'advanced_genetic': AdvancedGeneticLoader(data_dir),
             'advanced_medical': AdvancedMedicalLoader(data_dir),
-            'advanced_nci': AdvancedNCILoader(data_dir)
+            'advanced_nci': AdvancedNCILoader(data_dir),
+            'business': BusinessDatasetLoader(data_dir)
         }
         
         # Load dataset configuration

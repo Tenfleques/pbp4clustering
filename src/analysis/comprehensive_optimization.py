@@ -346,7 +346,7 @@ class ComprehensiveOptimizer:
         try:
             from src.data.loader import DatasetTransformer
             
-            # Create a temporary dataset transformer
+            # Create a temporary dataset transformer for reshaping functionality
             dt = DatasetTransformer()
             
             # Get target rows from strategy
@@ -550,10 +550,10 @@ def optimize_all_datasets(datasets: Dict[str, Any], output_dir: str = './optimiz
 
 if __name__ == "__main__":
     # Example usage
-    from src.data.loader import DatasetTransformer
+    from src.data.consolidated_loader import ConsolidatedDatasetLoader
     
     # Load datasets
-    dt = DatasetTransformer()
+    loader = ConsolidatedDatasetLoader()
     datasets = {}
     
     # Load a few datasets for testing
@@ -561,7 +561,7 @@ if __name__ == "__main__":
     
     for dataset_name in test_datasets:
         try:
-            dataset_data = dt.load_dataset(dataset_name)
+            dataset_data = loader.load_dataset(dataset_name)
             if dataset_data is not None:
                 datasets[dataset_name] = {
                     'X': dataset_data['X'],

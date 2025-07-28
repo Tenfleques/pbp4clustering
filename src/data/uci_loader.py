@@ -19,7 +19,7 @@ class UCIDatasetLoader(BaseDatasetLoader):
     Loader for UCI datasets.
     
     This class handles loading and preprocessing of UCI datasets including
-    Sonar, Glass, Vehicle, Ecoli, Yeast, Seeds, Thyroid, Pima, Ionosphere, and Spectf.
+    Sonar, Glass, Vehicle, Ecoli, Yeast, Seeds, Thyroid, Pima, Ionosphere.
     """
     
     def __init__(self, data_dir='./data'):
@@ -61,9 +61,9 @@ class UCIDatasetLoader(BaseDatasetLoader):
                 'url': 'https://archive.ics.uci.edu/ml/machine-learning-databases/ionosphere/ionosphere.data',
                 'target_column': -1
             },
-            'spectf': {
-                'url': 'https://archive.ics.uci.edu/ml/machine-learning-databases/spect/SPECTF.train',
-                'target_column': 0
+            'wine_quality_red': {
+                'url': 'https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv',
+                'target_column': -1
             }
         }
     
@@ -106,6 +106,9 @@ class UCIDatasetLoader(BaseDatasetLoader):
             elif dataset_name == 'thyroid':
                 # Thyroid dataset has special format
                 X, y = self._process_thyroid_data(data)
+            elif dataset_name == 'wine_quality_red':
+                # Wine quality dataset is CSV format
+                X, y = self._process_wine_quality_data(data)
             else:
                 # Standard CSV-like format
                 X, y = self._process_standard_uci_data(data, dataset_info['target_column'])
@@ -235,6 +238,41 @@ class UCIDatasetLoader(BaseDatasetLoader):
                     
                     X_list.append(features)
                     y_list.append(target)
+        
+        X = np.array(X_list)
+        y = np.array(y_list)
+        
+        return X, y
+    
+    def _process_wine_quality_data(self, data):
+        """Process wine quality dataset (CSV format)."""
+        X_list = []
+        y_list = []
+        
+        # Skip header line
+        for i, line in enumerate(data):
+            if i == 0:  # Skip header
+                continue
+            if line.strip():
+                values = line.strip().split(';')  # Wine quality uses semicolon separator
+                
+                # Extract features (all except last column)
+                features = []
+                for val in values[:-1]:
+                    try:
+                        features.append(float(val))
+                    except:
+                        features.append(0.0)
+                
+                # Extract target (last column)
+                target = values[-1]
+                try:
+                    target = int(target)
+                except:
+                    target = 5  # Default quality
+                
+                X_list.append(features)
+                y_list.append(target)
         
         X = np.array(X_list)
         y = np.array(y_list)

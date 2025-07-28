@@ -4,8 +4,8 @@ Data Loading and Transformation Module
 This module contains data loading and transformation functionality for PBP experiments.
 """
 
-from .loader import DatasetTransformer
+from .consolidated_loader import ConsolidatedDatasetLoader
 
 __all__ = [
-    "DatasetTransformer"
+    "ConsolidatedDatasetLoader"
 ] 

@@ -13,7 +13,7 @@ import logging
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.data.loader import DatasetTransformer
+from src.data.consolidated_loader import ConsolidatedDatasetLoader
 from src.analysis.comprehensive_optimization import ComprehensiveOptimizer
 
 # Configure logging
@@ -24,7 +24,7 @@ def test_comprehensive_optimization():
     """Test comprehensive optimization with a few datasets."""
     
     # Load datasets
-    dt = DatasetTransformer()
+    loader = ConsolidatedDatasetLoader()
     test_datasets = ['iris', 'wine', 'seeds']
     
     datasets = {}
@@ -32,7 +32,7 @@ def test_comprehensive_optimization():
     for dataset_name in test_datasets:
         try:
             logger.info(f"Loading dataset: {dataset_name}")
-            dataset_data = dt.load_dataset(dataset_name)
+            dataset_data = loader.load_dataset(dataset_name)
             
             if dataset_data is not None:
                 X = dataset_data['X']

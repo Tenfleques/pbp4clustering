@@ -42,6 +42,12 @@ class AdvancedMedicalLoader(BaseDatasetLoader):
                 'url': 'https://www.ebi.ac.uk/metabolights/MTBLS1',
                 'ftp_base': 'https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/'
             },
+            'metabolights_mtbls1': {
+                'study_id': 'MTBLS1',
+                'title': 'A metabolomics study of urinary changes in type 2 diabetes (MTBLS1)',
+                'url': 'https://www.ebi.ac.uk/metabolights/MTBLS1',
+                'ftp_base': 'https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/'
+            },
             'physionet': {
                 'database': 'MIT-BIH Arrhythmia Database',
                 'url': 'https://physionet.org/content/mitdb/1.0.0/',
@@ -90,6 +96,8 @@ class AdvancedMedicalLoader(BaseDatasetLoader):
                 return self._load_gdsc_expression()
             elif dataset_name == 'metabolights':
                 return self._load_metabolights()
+            elif dataset_name == 'metabolights_mtbls1':
+                return self._load_metabolights_mtbls1()
             elif dataset_name == 'physionet':
                 return self._load_physionet()
             elif dataset_name == 'mimic_demo':
@@ -191,6 +199,49 @@ class AdvancedMedicalLoader(BaseDatasetLoader):
                 
         except Exception as e:
             print(f"MetaboLights download error: {e}")
+        
+        return None
+    
+    def _load_metabolights_mtbls1(self):
+        """Load MetaboLights MTBLS1 metabolomics data."""
+        dataset_info = self.medical_datasets['metabolights_mtbls1']
+        
+        try:
+            # Try to download study metadata
+            study_url = f"{dataset_info['ftp_base']}{dataset_info['study_id']}/s_{dataset_info['study_id']}.txt"
+            print(f"Attempting MetaboLights MTBLS1 download: {study_url}")
+            
+            response = requests.get(study_url, timeout=30)
+            if response.status_code != 200:
+                print(f"Download failed (status {response.status_code})")
+                return None
+            
+            study_file = self.download_cache / f"s_{dataset_info['study_id']}_mtbls1.txt"
+            with open(study_file, 'wb') as f:
+                f.write(response.content)
+            
+            print(f"✓ Downloaded study metadata to {study_file}")
+            
+            # Try to download metabolite data
+            metabolite_url = f"{dataset_info['ftp_base']}{dataset_info['study_id']}/m_{dataset_info['study_id']}_metabolite_profiling_NMR_spectroscopy_v2_maf.tsv"
+            response = requests.get(metabolite_url, timeout=30)
+            if response.status_code != 200:
+                print(f"Metabolite data download failed (status {response.status_code})")
+                return None
+            
+            metabolite_file = self.download_cache / f"m_{dataset_info['study_id']}_metabolite_profiling_NMR_spectroscopy_v2_maf_mtbls1.tsv"
+            with open(metabolite_file, 'wb') as f:
+                f.write(response.content)
+            
+            print(f"✓ Downloaded metabolite data to {metabolite_file}")
+            
+            # Process the data
+            processed_data = self._process_metabolights_data(study_file, metabolite_file, 'metabolights_mtbls1')
+            if processed_data:
+                return processed_data
+                
+        except Exception as e:
+            print(f"MetaboLights MTBLS1 download error: {e}")
         
         return None
     

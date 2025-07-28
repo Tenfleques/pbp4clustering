@@ -9,15 +9,17 @@ the optimal one for each dataset based on clustering performance.
 import sys
 import os
 import json
+import logging
+from datetime import datetime
 from pathlib import Path
 import numpy as np
-from datetime import datetime
 
 # Add src to path
-sys.path.append('src')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.data.consolidated_loader import ConsolidatedDatasetLoader
 from src.analysis.aggregation_optimization import AggregationOptimizer, create_aggregation_comparison_report
+from src.data.dataset_config import get_core_datasets
 
 
 def main():
@@ -37,10 +39,7 @@ def main():
     print(f"Found {sum(len(datasets) for datasets in dataset_config.values())} datasets across {len(dataset_config)} categories")
     
     # Select datasets to test (limit to a reasonable number for testing)
-    test_datasets = [
-        'iris', 'breast_cancer', 'wine', 'digits', 'diabetes',
-        'sonar', 'glass', 'seeds', 'thyroid', 'pima'
-    ]
+    test_datasets = get_core_datasets()
     
     print(f"Testing aggregation functions on {len(test_datasets)} datasets:")
     for dataset_name in test_datasets:
@@ -76,7 +75,7 @@ def main():
     results = optimizer.optimize_multiple_datasets(datasets)
     
     # Create results directory
-    results_dir = Path('aggregation_optimization_results')
+    results_dir = Path('results/aggregation_optimization_results')
     results_dir.mkdir(exist_ok=True)
     
     # Save results

@@ -8,6 +8,9 @@ standard:breast_cancer
 standard:wine
 standard:digits
 standard:diabetes
+standard:breast_cancer_sklearn
+standard:digits_sklearn
+standard:wine_sklearn
 
 # UCI datasets
 uci:sonar
@@ -20,22 +23,28 @@ uci:thyroid
 uci:pima
 uci:ionosphere
 uci:spectf
+uci:wine_quality_red
 
 # Large datasets
 large:covertype
 large:kddcup99
 large:linnerrud
 large:species_distribution
+large:adult
+large:pc4
 
 # Advanced real datasets
-advanced_aids:aids_screen
 advanced_genetic:geo_breast_cancer
-advanced_genetic:1000_genomes_snp
 advanced_genetic:ebi_expression
 advanced_medical:gdsc_expression
 advanced_medical:metabolights
+advanced_medical:metabolights_mtbls1
 advanced_medical:physionet
 advanced_medical:mimic_demo
 advanced_medical:drug_response
 advanced_medical:imaging_features
-advanced_nci:nci_chemical 
+advanced_nci:nci_chemical
+
+# Business datasets
+business:churn
+business:credit_approval 

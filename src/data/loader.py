@@ -916,7 +916,6 @@ class DatasetTransformer:
             'thyroid': self.load_thyroid_dataset,
             'pima': self.load_pima_dataset,
             'ionosphere': self.load_ionosphere_dataset,
-            # 'spectf': self.load_spectf_dataset,
             'glass_conforming': self.load_glass_conforming_dataset,
             # New datasets from suitability analysis
             'covertype': self.load_covertype_dataset,
@@ -1452,41 +1451,6 @@ class DatasetTransformer:
             print(f"Error loading Ionosphere dataset: {e}")
             return None
     
-    def load_spectf_dataset(self):
-        """Load and transform SPECTF Heart dataset into matrix format."""
-        print("Loading SPECTF dataset...")
-        
-        try:
-            # Load from the data directory
-            X = np.load('./data/spectf_X_matrix.npy', allow_pickle=True)
-            y = np.load('./data/spectf_y.npy', allow_pickle=True)
-            
-            # Load metadata
-            with open('./data/spectf_metadata.json', 'r') as f:
-                metadata = json.load(f)
-                # Handle case where metadata is a list
-                if isinstance(metadata, list):
-                    metadata = metadata[0] if metadata else {}
-            
-            feature_names = ['Heart_Regions']
-            measurement_names = [f'ROI_{i+1}' for i in range(22)]
-            
-            self.datasets['spectf'] = {
-                'X': X,
-                'y': y,
-                'feature_names': feature_names,
-                'measurement_names': measurement_names,
-                'target_names': ['Cardiac_Diagnosis'],
-                'description': metadata.get('transformation_rationale', 'Heart regions with perfusion data'),
-                'metadata': metadata
-            }
-            
-            print(f"SPECTF dataset loaded: {X.shape[0]} samples of shape {X.shape[1]}x{X.shape[2]}")
-            return self.datasets['spectf']
-            
-        except Exception as e:
-            print(f"Error loading SPECTF dataset: {e}")
-            return None
     
     def load_glass_conforming_dataset(self):
         """Load and transform Glass conforming dataset into 2x4 matrices."""
@@ -1864,7 +1828,6 @@ class DatasetTransformer:
             'thyroid',
             'pima',
             'ionosphere',
-            'spectf',
             'glass_conforming',
             # New datasets from suitability analysis
             'covertype',
