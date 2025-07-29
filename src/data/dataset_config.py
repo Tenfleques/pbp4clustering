@@ -64,7 +64,7 @@ SPECIAL_DATASETS = [
 BIOMATHEMATICS_DATASETS = [
     # Ecology and Environmental Health
     'species_distribution',      # Species distribution modeling
-    'covertype',                # Forest cover type (environmental health)
+    # 'covertype',                # Forest cover type (environmental health)
     
     # Medical and Health
     'breast_cancer',            # Cancer diagnosis (health modeling)

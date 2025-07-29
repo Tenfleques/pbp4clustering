@@ -11,7 +11,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score, davies_bouldin_score
+from sklearn.metrics import (
+            silhouette_score, davies_bouldin_score, calinski_harabasz_score,
+            adjusted_rand_score, normalized_mutual_info_score,
+            homogeneity_score, completeness_score, v_measure_score,
+            fowlkes_mallows_score
+        )
 from sklearn.decomposition import PCA
 import os
 import sys
@@ -197,7 +202,7 @@ class DatasetTester:
         return X_reduced, "PCA"
     
     def evaluate_clustering(self, X_reduced, y_true, n_clusters=None):
-        """Evaluate clustering performance."""
+        """Evaluate clustering performance on both full dataset and informative indices only."""
         if n_clusters is None:
             n_clusters = len(np.unique(y_true))
         
@@ -208,22 +213,136 @@ class DatasetTester:
                 'silhouette_score': 0.0,
                 'davies_bouldin_score': float('inf'),
                 'y_pred': np.zeros(X_reduced.shape[0]),
-                'cluster_centers': np.array([])
+                'cluster_centers': np.array([]),
+                'informative_indices': [],
+                'informative_silhouette_score': 0.0,
+                'informative_davies_bouldin_score': float('inf'),
+                'informative_y_pred': np.zeros(X_reduced.shape[0]),
+                'calinski_harabasz_score': 0.0,
+                'informative_calinski_harabasz_score': 0.0,
+                'adjusted_rand_score': 0.0,
+                'informative_adjusted_rand_score': 0.0,
+                'normalized_mutual_info_score': 0.0,
+                'informative_normalized_mutual_info_score': 0.0,
+                'homogeneity_score': 0.0,
+                'informative_homogeneity_score': 0.0,
+                'completeness_score': 0.0,
+                'informative_completeness_score': 0.0,
+                'v_measure_score': 0.0,
+                'informative_v_measure_score': 0.0,
+                'fowlkes_mallows_score': 0.0,
+                'informative_fowlkes_mallows_score': 0.0
             }
         
-        # Apply K-means clustering
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-        y_pred = kmeans.fit_predict(X_reduced)
         
-        # Calculate metrics
-        silhouette = silhouette_score(X_reduced, y_pred)
-        davies_bouldin = davies_bouldin_score(X_reduced, y_pred)
+        
+        # First, evaluate clustering on the full dataset
+        kmeans_full = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        y_pred_full = kmeans_full.fit_predict(X_reduced)
+        
+        # Calculate comprehensive metrics for full dataset
+        silhouette_full = silhouette_score(X_reduced, y_pred_full)
+        davies_bouldin_full = davies_bouldin_score(X_reduced, y_pred_full)
+        calinski_harabasz_full = calinski_harabasz_score(X_reduced, y_pred_full)
+        
+        # Classification metrics (comparing clustering to true labels)
+        adjusted_rand_full = adjusted_rand_score(y_true, y_pred_full)
+        normalized_mutual_info_full = normalized_mutual_info_score(y_true, y_pred_full)
+        homogeneity_full = homogeneity_score(y_true, y_pred_full)
+        completeness_full = completeness_score(y_true, y_pred_full)
+        v_measure_full = v_measure_score(y_true, y_pred_full)
+        fowlkes_mallows_full = fowlkes_mallows_score(y_true, y_pred_full)
+        
+        # Now, select informative columns and evaluate clustering on those only
+        informative_indices, X_informative, _ = self.select_informative_columns(
+            X_reduced, y_pred_full, n_components=min(3, X_reduced.shape[1])
+        )
+        
+        # Evaluate clustering on informative indices only
+        kmeans_informative = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        y_pred_informative = kmeans_informative.fit_predict(X_informative)
+        
+        # Calculate comprehensive metrics for informative indices only
+        silhouette_informative = silhouette_score(X_informative, y_pred_informative)
+        davies_bouldin_informative = davies_bouldin_score(X_informative, y_pred_informative)
+        calinski_harabasz_informative = calinski_harabasz_score(X_informative, y_pred_informative)
+        
+        # Classification metrics for informative indices
+        adjusted_rand_informative = adjusted_rand_score(y_true, y_pred_informative)
+        normalized_mutual_info_informative = normalized_mutual_info_score(y_true, y_pred_informative)
+        homogeneity_informative = homogeneity_score(y_true, y_pred_informative)
+        completeness_informative = completeness_score(y_true, y_pred_informative)
+        v_measure_informative = v_measure_score(y_true, y_pred_informative)
+        fowlkes_mallows_informative = fowlkes_mallows_score(y_true, y_pred_informative)
+        
+        # Calculate improvements
+        silhouette_improvement = silhouette_informative - silhouette_full
+        davies_bouldin_improvement = davies_bouldin_full - davies_bouldin_informative  # Lower is better
+        calinski_harabasz_improvement = calinski_harabasz_informative - calinski_harabasz_full
+        adjusted_rand_improvement = adjusted_rand_informative - adjusted_rand_full
+        normalized_mutual_info_improvement = normalized_mutual_info_informative - normalized_mutual_info_full
+        homogeneity_improvement = homogeneity_informative - homogeneity_full
+        completeness_improvement = completeness_informative - completeness_full
+        v_measure_improvement = v_measure_informative - v_measure_full
+        fowlkes_mallows_improvement = fowlkes_mallows_informative - fowlkes_mallows_full
+        
+        print(f"  Full dataset ({X_reduced.shape[1]} features):")
+        print(f"    Silhouette Score: {silhouette_full:.4f}")
+        print(f"    Davies-Bouldin Score: {davies_bouldin_full:.4f}")
+        print(f"    Calinski-Harabasz Score: {calinski_harabasz_full:.2f}")
+        print(f"    Adjusted Rand Score: {adjusted_rand_full:.4f}")
+        print(f"    Normalized Mutual Info: {normalized_mutual_info_full:.4f}")
+        print(f"    V-Measure Score: {v_measure_full:.4f}")
+        
+        print(f"  Informative indices only ({len(informative_indices)} features):")
+        print(f"    Silhouette Score: {silhouette_informative:.4f}")
+        print(f"    Davies-Bouldin Score: {davies_bouldin_informative:.4f}")
+        print(f"    Calinski-Harabasz Score: {calinski_harabasz_informative:.2f}")
+        print(f"    Adjusted Rand Score: {adjusted_rand_informative:.4f}")
+        print(f"    Normalized Mutual Info: {normalized_mutual_info_informative:.4f}")
+        print(f"    V-Measure Score: {v_measure_informative:.4f}")
+        
+        print(f"  Improvement:")
+        print(f"    Silhouette: {silhouette_improvement:+.4f}")
+        print(f"    Davies-Bouldin: {davies_bouldin_improvement:+.4f}")
+        print(f"    Calinski-Harabasz: {calinski_harabasz_improvement:+.2f}")
+        print(f"    Adjusted Rand: {adjusted_rand_improvement:+.4f}")
+        print(f"    Normalized Mutual Info: {normalized_mutual_info_improvement:+.4f}")
+        print(f"    V-Measure: {v_measure_improvement:+.4f}")
         
         return {
-            'silhouette_score': silhouette,
-            'davies_bouldin_score': davies_bouldin,
-            'y_pred': y_pred,
-            'cluster_centers': kmeans.cluster_centers_
+            'silhouette_score': silhouette_full,
+            'davies_bouldin_score': davies_bouldin_full,
+            'calinski_harabasz_score': calinski_harabasz_full,
+            'adjusted_rand_score': adjusted_rand_full,
+            'normalized_mutual_info_score': normalized_mutual_info_full,
+            'homogeneity_score': homogeneity_full,
+            'completeness_score': completeness_full,
+            'v_measure_score': v_measure_full,
+            'fowlkes_mallows_score': fowlkes_mallows_full,
+            'y_pred': y_pred_full,
+            'cluster_centers': kmeans_full.cluster_centers_,
+            'informative_indices': informative_indices,
+            'informative_silhouette_score': silhouette_informative,
+            'informative_davies_bouldin_score': davies_bouldin_informative,
+            'informative_calinski_harabasz_score': calinski_harabasz_informative,
+            'informative_adjusted_rand_score': adjusted_rand_informative,
+            'informative_normalized_mutual_info_score': normalized_mutual_info_informative,
+            'informative_homogeneity_score': homogeneity_informative,
+            'informative_completeness_score': completeness_informative,
+            'informative_v_measure_score': v_measure_informative,
+            'informative_fowlkes_mallows_score': fowlkes_mallows_informative,
+            'informative_y_pred': y_pred_informative,
+            'X_informative': X_informative,
+            'silhouette_improvement': silhouette_improvement,
+            'davies_bouldin_improvement': davies_bouldin_improvement,
+            'calinski_harabasz_improvement': calinski_harabasz_improvement,
+            'adjusted_rand_improvement': adjusted_rand_improvement,
+            'normalized_mutual_info_improvement': normalized_mutual_info_improvement,
+            'homogeneity_improvement': homogeneity_improvement,
+            'completeness_improvement': completeness_improvement,
+            'v_measure_improvement': v_measure_improvement,
+            'fowlkes_mallows_improvement': fowlkes_mallows_improvement
         }
     
     def get_pbp_component_names(self, vector_length, num_rows):
@@ -674,26 +793,36 @@ class DatasetTester:
         print("\nEvaluating clustering performance...")
         clustering_results = self.evaluate_clustering(X_reduced, y)
         
-        print(f"Silhouette Score: {clustering_results['silhouette_score']:.4f}")
-        print(f"Davies-Bouldin Score: {clustering_results['davies_bouldin_score']:.4f}")
-        
         # Get aggregation function info
         agg_func_name = self.optimal_aggregation_functions.get(dataset_name, 'sum')
         
         # Visualize results
         print("\nGenerating visualizations...")
         if visualize:
-            self.visualize_results(X_reduced, y, clustering_results['y_pred'], 
-                                dataset_name, metadata, method_label=method_label)
+            # Use informative indices for visualization if available
+            informative_silhouette = clustering_results.get('informative_silhouette_score', 0.0)
+            informative_davies_bouldin = clustering_results.get('informative_davies_bouldin_score', float('inf'))
+            informative_v_measure = clustering_results.get('informative_v_measure_score', 0.0)
+            informative_adjusted_rand = clustering_results.get('informative_adjusted_rand_score', 0.0)
+
+            if 'X_informative' in clustering_results and clustering_results['X_informative'] is not None:
+                method_label_informative = f"{method_label} Sil: {informative_silhouette:.2f} DB: {informative_davies_bouldin:.2f} V: {informative_v_measure:.2f} AR: {informative_adjusted_rand:.2f}"
+                self.visualize_results(clustering_results['X_informative'], y, clustering_results['informative_y_pred'], 
+                                    dataset_name, metadata, method_label=method_label_informative)
+            else:
+                self.visualize_results(X_reduced, y, clustering_results['y_pred'], 
+                                    dataset_name, metadata, method_label=method_label)
         
-        # Store results
+        # Store results with informative indices information
         self.results[dataset_name] = {
             'original_shape': X.shape,
             'reduced_shape': X_reduced.shape,
             'clustering_results': clustering_results,
             'metadata': metadata,
             'aggregation_function': agg_func_name,
-            'method_label': method_label
+            'method_label': method_label,
+            'informative_indices': clustering_results.get('informative_indices', []),
+            'informative_shape': clustering_results.get('X_informative', X_reduced).shape if 'X_informative' in clustering_results else X_reduced.shape
         }
         
         return self.results[dataset_name]
@@ -724,6 +853,9 @@ class DatasetTester:
         
         for dataset_name in tqdm.tqdm(all_datasets, desc="Testing datasets"):
             try:
+                if dataset_name in ["covertype"]:
+                    print("Skipping large datasets")
+                    continue
                 result = self.test_dataset(dataset_name, visualize=visualize)
                 if result:
                     results[dataset_name] = result
@@ -748,6 +880,7 @@ class DatasetTester:
         # Create summary table
         summary_data = []
         pbp_component_info = {}
+        informative_analysis = {}
         
         for name, result in results.items():
             # Get PBP component names if this is a PBP method
@@ -761,16 +894,54 @@ class DatasetTester:
                 except Exception as e:
                     print(f"Warning: Could not generate PBP component names for {name}: {e}")
             
+            # Get informative indices analysis
+            clustering_results = result['clustering_results']
+            informative_indices = clustering_results.get('informative_indices', [])
+            informative_silhouette = clustering_results.get('informative_silhouette_score', 0.0)
+            informative_davies_bouldin = clustering_results.get('informative_davies_bouldin_score', float('inf'))
+            informative_v_measure = clustering_results.get('informative_v_measure_score', 0.0)
+            informative_adjusted_rand = clustering_results.get('informative_adjusted_rand_score', 0.0)
+            silhouette_improvement = clustering_results.get('silhouette_improvement', 0.0)
+            davies_bouldin_improvement = clustering_results.get('davies_bouldin_improvement', 0.0)
+            v_measure_improvement = clustering_results.get('v_measure_improvement', 0.0)
+            adjusted_rand_improvement = clustering_results.get('adjusted_rand_improvement', 0.0)
+            
             summary_data.append({
                 'Dataset': name,
                 'Original Shape': f"{result['original_shape'][1]}x{result['original_shape'][2]}",
                 'Reduced Shape': f"{result['reduced_shape'][1]}",
+                'Informative Features': len(informative_indices),
                 'Aggregation Function': result.get('aggregation_function', 'sum'),
-                'Silhouette Score': f"{result['clustering_results']['silhouette_score']:.4f}",
-                'Davies-Bouldin Score': f"{result['clustering_results']['davies_bouldin_score']:.4f}",
+                'Full Silhouette': f"{clustering_results['silhouette_score']:.4f}",
+                'Full Davies-Bouldin': f"{clustering_results['davies_bouldin_score']:.4f}",
+                'Full V-Measure': f"{clustering_results.get('v_measure_score', 0.0):.4f}",
+                'Full Adjusted Rand': f"{clustering_results.get('adjusted_rand_score', 0.0):.4f}",
+                'Informative Silhouette': f"{informative_silhouette:.4f}",
+                'Informative Davies-Bouldin': f"{informative_davies_bouldin:.4f}",
+                'Informative V-Measure': f"{informative_v_measure:.4f}",
+                'Informative Adjusted Rand': f"{informative_adjusted_rand:.4f}",
+                'Silhouette Improvement': f"{silhouette_improvement:+.4f}",
+                'Davies-Bouldin Improvement': f"{davies_bouldin_improvement:+.4f}",
+                'V-Measure Improvement': f"{v_measure_improvement:+.4f}",
+                'Adjusted Rand Improvement': f"{adjusted_rand_improvement:+.4f}",
                 'Description': result['metadata']['description'],
                 'PBP Components': len(pbp_components) if pbp_components else 'N/A'
             })
+            
+            # Store informative analysis for detailed report
+            informative_analysis[name] = {
+                'informative_indices': informative_indices,
+                'silhouette_improvement': silhouette_improvement,
+                'davies_bouldin_improvement': davies_bouldin_improvement,
+                'v_measure_improvement': v_measure_improvement,
+                'adjusted_rand_improvement': adjusted_rand_improvement,
+                'full_silhouette': clustering_results['silhouette_score'],
+                'informative_silhouette': informative_silhouette,
+                'full_v_measure': clustering_results.get('v_measure_score', 0.0),
+                'informative_v_measure': informative_v_measure,
+                'full_adjusted_rand': clustering_results.get('adjusted_rand_score', 0.0),
+                'informative_adjusted_rand': informative_adjusted_rand
+            }
         
         summary_df = pd.DataFrame(summary_data)
         print(summary_df.to_string(index=False))
@@ -790,14 +961,61 @@ class DatasetTester:
                 for i, component in enumerate(components):
                     print(f"  Component {i+1}: {component}")
         
-        # Find best performing datasets
-        best_silhouette = max(results.items(), 
-                             key=lambda x: x[1]['clustering_results']['silhouette_score'])
-        best_davies = min(results.items(), 
-                         key=lambda x: x[1]['clustering_results']['davies_bouldin_score'])
+        # Find best performing datasets (both full and informative)
+        best_full_silhouette = max(results.items(), 
+                                  key=lambda x: x[1]['clustering_results']['silhouette_score'])
+        best_full_davies = min(results.items(), 
+                              key=lambda x: x[1]['clustering_results']['davies_bouldin_score'])
         
-        print(f"\nBest Silhouette Score: {best_silhouette[0]} ({best_silhouette[1]['clustering_results']['silhouette_score']:.4f})")
-        print(f"Best Davies-Bouldin Score: {best_davies[0]} ({best_davies[1]['clustering_results']['davies_bouldin_score']:.4f})")
+        best_informative_silhouette = max(results.items(), 
+                                        key=lambda x: x[1]['clustering_results'].get('informative_silhouette_score', 0.0))
+        best_informative_davies = min(results.items(), 
+                                    key=lambda x: x[1]['clustering_results'].get('informative_davies_bouldin_score', float('inf')))
+        
+        print(f"\n{'='*60}")
+        print("BEST PERFORMING DATASETS")
+        print(f"{'='*60}")
+        print(f"Best Full Silhouette Score: {best_full_silhouette[0]} ({best_full_silhouette[1]['clustering_results']['silhouette_score']:.4f})")
+        print(f"Best Full Davies-Bouldin Score: {best_full_davies[0]} ({best_full_davies[1]['clustering_results']['davies_bouldin_score']:.4f})")
+        print(f"Best Informative Silhouette Score: {best_informative_silhouette[0]} ({best_informative_silhouette[1]['clustering_results'].get('informative_silhouette_score', 0.0):.4f})")
+        print(f"Best Informative Davies-Bouldin Score: {best_informative_davies[0]} ({best_informative_davies[1]['clustering_results'].get('informative_davies_bouldin_score', float('inf')):.4f})")
+        
+        # Analyze informative indices improvements
+        print(f"\n{'='*60}")
+        print("INFORMATIVE INDICES ANALYSIS")
+        print(f"{'='*60}")
+        
+        improvements = []
+        for name, analysis in informative_analysis.items():
+            if (analysis['silhouette_improvement'] > 0 or analysis['davies_bouldin_improvement'] > 0 or 
+                analysis['v_measure_improvement'] > 0 or analysis['adjusted_rand_improvement'] > 0):
+                improvements.append({
+                    'dataset': name,
+                    'silhouette_improvement': analysis['silhouette_improvement'],
+                    'davies_bouldin_improvement': analysis['davies_bouldin_improvement'],
+                    'v_measure_improvement': analysis['v_measure_improvement'],
+                    'adjusted_rand_improvement': analysis['adjusted_rand_improvement'],
+                    'informative_features': len(analysis['informative_indices'])
+                })
+        
+        if improvements:
+            print("Datasets with improvement using informative indices:")
+            for imp in sorted(improvements, key=lambda x: x['silhouette_improvement'], reverse=True):
+                print(f"  {imp['dataset']}: Sil +{imp['silhouette_improvement']:.4f}, DB +{imp['davies_bouldin_improvement']:.4f}, V +{imp['v_measure_improvement']:.4f}, AR +{imp['adjusted_rand_improvement']:.4f} ({imp['informative_features']} features)")
+        else:
+            print("No datasets showed improvement with informative indices selection.")
+        
+        # Calculate average improvements
+        avg_silhouette_improvement = np.mean([analysis['silhouette_improvement'] for analysis in informative_analysis.values()])
+        avg_davies_bouldin_improvement = np.mean([analysis['davies_bouldin_improvement'] for analysis in informative_analysis.values()])
+        avg_v_measure_improvement = np.mean([analysis['v_measure_improvement'] for analysis in informative_analysis.values()])
+        avg_adjusted_rand_improvement = np.mean([analysis['adjusted_rand_improvement'] for analysis in informative_analysis.values()])
+        
+        print(f"\nAverage improvements across all datasets:")
+        print(f"  Silhouette Score: {avg_silhouette_improvement:+.4f}")
+        print(f"  Davies-Bouldin Score: {avg_davies_bouldin_improvement:+.4f}")
+        print(f"  V-Measure Score: {avg_v_measure_improvement:+.4f}")
+        print(f"  Adjusted Rand Score: {avg_adjusted_rand_improvement:+.4f}")
         
         # Performance statistics
         silhouette_scores = [r['clustering_results']['silhouette_score'] for r in results.values()]
@@ -850,6 +1068,14 @@ class DatasetTester:
                     domain = domain_name
                     break
             
+            # Get clustering results and informative indices analysis
+            clustering_results = result['clustering_results']
+            informative_indices = clustering_results.get('informative_indices', [])
+            informative_silhouette = clustering_results.get('informative_silhouette_score', 0.0)
+            informative_davies_bouldin = clustering_results.get('informative_davies_bouldin_score', float('inf'))
+            silhouette_improvement = clustering_results.get('silhouette_improvement', 0.0)
+            davies_bouldin_improvement = clustering_results.get('davies_bouldin_improvement', 0.0)
+            
             # Get PBP component names if this is a PBP method
             pbp_components = []
             if "PBP" in result.get('method_label', ''):
@@ -865,9 +1091,20 @@ class DatasetTester:
                 'Domain': domain,
                 'Original Shape': f"{result['original_shape'][1]}x{result['original_shape'][2]}",
                 'Reduced Shape': f"{result['reduced_shape'][1]}",
+                'Informative Features': len(informative_indices),
                 'Aggregation Function': result.get('aggregation_function', 'sum'),
-                'Silhouette Score': f"{result['clustering_results']['silhouette_score']:.4f}",
-                'Davies-Bouldin Score': f"{result['clustering_results']['davies_bouldin_score']:.4f}",
+                'Full Silhouette': f"{clustering_results['silhouette_score']:.4f}",
+                'Full Davies-Bouldin': f"{clustering_results['davies_bouldin_score']:.4f}",
+                'Full V-Measure': f"{clustering_results.get('v_measure_score', 0.0):.4f}",
+                'Full Adjusted Rand': f"{clustering_results.get('adjusted_rand_score', 0.0):.4f}",
+                'Informative Silhouette': f"{informative_silhouette:.4f}",
+                'Informative Davies-Bouldin': f"{informative_davies_bouldin:.4f}",
+                # 'Informative V-Measure': f"{informative_v_measure:.4f}",
+                # 'Informative Adjusted Rand': f"{informative_adjusted_rand:.4f}",
+                'Silhouette Improvement': f"{silhouette_improvement:+.4f}",
+                'Davies-Bouldin Improvement': f"{davies_bouldin_improvement:+.4f}",
+                # 'V-Measure Improvement': f"{v_measure_improvement:+.4f}",
+                # 'Adjusted Rand Improvement': f"{adjusted_rand_improvement:+.4f}",
                 'Description': result['metadata']['description'],
                 'PBP Components': len(pbp_components) if pbp_components else 'N/A'
             })
@@ -923,6 +1160,51 @@ class DatasetTester:
         print(f"Average Davies-Bouldin Score: {np.mean(davies_scores):.4f} ± {np.std(davies_scores):.4f}")
         print(f"Best Overall Performance: {max(results.items(), key=lambda x: x[1]['clustering_results']['silhouette_score'])[0]}")
         
+        # Informative indices analysis for biomathematics
+        print(f"\n{'='*60}")
+        print("INFORMATIVE INDICES ANALYSIS FOR BIOMATHEMATICS")
+        print(f"{'='*60}")
+        
+        biomathematics_improvements = []
+        for name, result in results.items():
+            clustering_results = result['clustering_results']
+            silhouette_improvement = clustering_results.get('silhouette_improvement', 0.0)
+            davies_bouldin_improvement = clustering_results.get('davies_bouldin_improvement', 0.0)
+            v_measure_improvement = clustering_results.get('v_measure_improvement', 0.0)
+            adjusted_rand_improvement = clustering_results.get('adjusted_rand_improvement', 0.0)
+            informative_indices = clustering_results.get('informative_indices', [])
+            
+            if (silhouette_improvement > 0 or davies_bouldin_improvement > 0 or 
+                v_measure_improvement > 0 or adjusted_rand_improvement > 0):
+                biomathematics_improvements.append({
+                    'dataset': name,
+                    'domain': next((domain for domain, datasets in domain_categories.items() if name in datasets), 'Other'),
+                    'silhouette_improvement': silhouette_improvement,
+                    'davies_bouldin_improvement': davies_bouldin_improvement,
+                    'v_measure_improvement': v_measure_improvement,
+                    'adjusted_rand_improvement': adjusted_rand_improvement,
+                    'informative_features': len(informative_indices)
+                })
+        
+        if biomathematics_improvements:
+            print("Biomathematics datasets with improvement using informative indices:")
+            for imp in sorted(biomathematics_improvements, key=lambda x: x['silhouette_improvement'], reverse=True):
+                print(f"  {imp['dataset']} ({imp['domain']}): Sil +{imp['silhouette_improvement']:.4f}, DB +{imp['davies_bouldin_improvement']:.4f}, V +{imp['v_measure_improvement']:.4f}, AR +{imp['adjusted_rand_improvement']:.4f} ({imp['informative_features']} features)")
+        else:
+            print("No biomathematics datasets showed improvement with informative indices selection.")
+        
+        # Calculate average improvements for biomathematics
+        avg_silhouette_improvement = np.mean([r['clustering_results'].get('silhouette_improvement', 0.0) for r in results.values()])
+        avg_davies_bouldin_improvement = np.mean([r['clustering_results'].get('davies_bouldin_improvement', 0.0) for r in results.values()])
+        avg_v_measure_improvement = np.mean([r['clustering_results'].get('v_measure_improvement', 0.0) for r in results.values()])
+        avg_adjusted_rand_improvement = np.mean([r['clustering_results'].get('adjusted_rand_improvement', 0.0) for r in results.values()])
+        
+        print(f"\nAverage improvements across biomathematics datasets:")
+        print(f"  Silhouette Score: {avg_silhouette_improvement:+.4f}")
+        print(f"  Davies-Bouldin Score: {avg_davies_bouldin_improvement:+.4f}")
+        print(f"  V-Measure Score: {avg_v_measure_improvement:+.4f}")
+        print(f"  Adjusted Rand Score: {avg_adjusted_rand_improvement:+.4f}")
+        
         # Aggregation function usage for biomathematics
         if self.use_optimized_aggregation:
             agg_func_counts = {}
@@ -940,7 +1222,6 @@ def main():
     # Create data directory if it doesn't exist
     data_dir = './data'
     results_dir = './results'
-    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--visualize", action="store_true", help="Visualize results")
     parser.add_argument("--biomat", action="store_true", help="Target biomathematics datasets only")
@@ -972,6 +1253,10 @@ def main():
         results = {}
         for dataset_name in tqdm.tqdm(biomat_datasets, desc="Testing biomathematics datasets"):
             try:
+                if dataset_name in ["covertype"]:
+                    print("Skipping large datasets")
+                    continue
+
                 result = tester.test_dataset(dataset_name, visualize=visualize)
                 if result:
                     results[dataset_name] = result
