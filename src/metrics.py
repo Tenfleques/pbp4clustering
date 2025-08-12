@@ -112,9 +112,15 @@ def safe_supervised_metrics(
         "boundary_complexity": np.nan,
     }
     
-    # Setup cross-validation
+    # Setup cross-validation (adapt splits to class counts when possible)
     try:
-        cv = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=0)
+        # Compute minimum class count to determine feasible n_splits
+        _, counts = np.unique(y, return_counts=True)
+        min_class_count = int(counts.min()) if counts.size > 0 else 0
+        effective_splits = min(int(cv_splits), max(0, min_class_count))
+        if effective_splits < 2:
+            return metrics
+        cv = StratifiedKFold(n_splits=effective_splits, shuffle=True, random_state=0)
     except Exception:
         # If not enough samples for stratified, return NaN metrics
         return metrics

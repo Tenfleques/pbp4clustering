@@ -5,6 +5,7 @@ scipy>=1.7.0
 
 # Machine learning and clustering
 scikit-learn>=1.0.0
+umap-learn>=0.5.5
 
 # Visualization
 matplotlib>=3.4.0

@@ -1,174 +1,140 @@
 #!/usr/bin/env python3
-import argparse
-from pathlib import Path
-from typing import Any, Dict
-from visualize import scatter_features
-import numpy as np
+"""
+Refactored Retail dataset runner with complex preprocessing.
+"""
+
+from typing import Dict
+from src.base_runner import BaseRunner
+from src.cli_args import get_base_parser, add_data_dir_arg
 from datasets.online_retail_loader import load_online_retail_matrices
-from pbp_transform import matrices_to_pbp_vectors
-from sklearn.cluster import KMeans
-from sklearn.metrics import (
-    v_measure_score,
-    adjusted_rand_score,
-    silhouette_score,
-    calinski_harabasz_score,
-    davies_bouldin_score,
-)
-from sklearn.model_selection import StratifiedKFold, cross_val_score, cross_val_predict
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import LinearSVC
-from sklearn.neighbors import KNeighborsClassifier
+import numpy as np
+
+
+class RetailRunner(BaseRunner):
+    """Custom runner for Retail dataset with complex preprocessing options."""
+    
+    def __init__(self):
+        super().__init__("retail")
+    
+    def load_data(self, args):
+        X_mats, y, meta = load_online_retail_matrices(args.data_dir)
+        return X_mats, y, meta
+    
+    def preprocess_matrices(self, X_matrices, args):
+        X_mats = X_matrices.copy()
+        
+        # Optional: aggregate months into larger windows
+        if args.months_agg is not None:
+            N, m, n = X_mats.shape
+            b = int(args.months_agg)
+            if n % b == 0:
+                X_mats = X_mats.reshape(N, m, n // b, b).mean(axis=3)
+                print(f"Aggregated months by {b}: new shape={X_mats.shape}")
+                if args.rows_from_months:
+                    X_mats = np.swapaxes(X_mats, 1, 2)
+                    print(f"Transposed to rows-from-months: shape={X_mats.shape}")
+            else:
+                print(f"Warning: months ({n}) not divisible by {b}; skipping months aggregation")
+        
+        # Optional: PCA reduction on rows
+        if args.rows is not None:
+            from sklearn.decomposition import PCA
+            N, m, n = X_mats.shape
+            target_m = int(args.rows)
+            if target_m < m:
+                X_flat = X_mats.reshape(N, m * n)
+                pca = PCA(n_components=target_m, random_state=0)
+                X_reduced = pca.fit_transform(X_flat.T).T
+                X_mats = X_reduced.reshape(N, target_m, n)
+                print(f"Reduced rows from {m} to {target_m} via PCA: shape={X_mats.shape}")
+        
+        return X_mats
+    
+    def run(self, args):
+        # Load and preprocess data
+        X_matrices, y_orig, metadata = self.load_data(args)
+        print(f"Loaded {self.dataset_name}: matrices={X_matrices.shape}, labels={y_orig.shape}")
+        if "matrix_shape" in metadata:
+            print(f"  Matrix shape: {metadata['matrix_shape']}")
+        
+        # Handle top-K countries filtering
+        y = y_orig.copy()
+        if args.top_k_countries is not None and args.top_k_countries > 0:
+            k = int(args.top_k_countries)
+            counts = np.bincount(y)
+            top_ids = np.argsort(counts)[::-1][:k]
+            remap: Dict[int, int] = {int(cid): i for i, cid in enumerate(top_ids)}
+            other_id_new = k
+            y = np.array([remap.get(int(lbl), other_id_new) for lbl in y], dtype=int)
+            
+            # Update labels for display
+            id_to_country = {v: k for k, v in (metadata.get("label_map") or {}).items()}
+            kept = [id_to_country.get(int(cid), str(cid)) for cid in top_ids]
+            kept.append("Other")
+            metadata["labels_map"] = {i: name for i, name in enumerate(kept)}
+            print(f"Kept top {k} countries: {kept[:-1]}")
+        
+        # Apply preprocessing
+        X_matrices = self.preprocess_matrices(X_matrices, args)
+        
+        # Continue with standard pipeline
+        from pbp_transform import matrices_to_pbp_vectors
+        from src.pipeline import filter_zero_columns, cluster_and_predict
+        from src.metrics import calculate_all_metrics
+        from src.utils import print_metrics_summary
+        from visualize import scatter_features
+        from pathlib import Path
+        
+        X_pbp = matrices_to_pbp_vectors(X_matrices, agg=args.agg)
+        X_pbp = np.asarray(X_pbp)
+        print(f"PBP vectors: {X_pbp.shape} (agg={args.agg})")
+        
+        X_pbp = filter_zero_columns(X_pbp)
+        
+        if args.plot:
+            out_png = str(Path(args.results_dir) / f"retail_targets_pbp_{args.agg}.png")
+            title = f"Retail PBP (agg={args.agg}) - Countries"
+            scatter_features(X_pbp, y, out_png, title=title, label_names=metadata.get("labels_map"))
+            print(f"Saved: {out_png}")
+        
+        n_clusters = len(set(int(v) for v in y))
+        pred, km = cluster_and_predict(X_pbp, n_clusters=n_clusters)
+        
+        cv_splits = getattr(args, "cv_splits", 3)
+        all_metrics = calculate_all_metrics(X_pbp, y, pred, km, cv_splits)
+        
+        print_metrics_summary(
+            all_metrics["cluster"],
+            all_metrics["supervised"],
+            {
+                "dataset_name": "Retail",
+                "agg_func": args.agg,
+                "n_samples": X_pbp.shape[0],
+                "n_features": X_pbp.shape[1],
+                "n_clusters": n_clusters
+            }
+        )
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run PBP on UCI Online Retail II per-customer matrices and report metrics.")
-    parser.add_argument("--data-dir", default="./data/retail", help="Download/cache directory")
-    parser.add_argument("--results-dir", default="./results", help="Directory to write outputs")
-    parser.add_argument("--agg", default="sum", help="Aggregation function name")
-    parser.add_argument("--rows", type=int, default=None, help="Optionally reduce rows (m) to this value via PCA before PBP (e.g., 2 or 3)")
-    parser.add_argument("--top-k-countries", type=int, default=6, help="Keep K most frequent countries; map others to 'Other'")
-    parser.add_argument("--months-agg", type=int, choices=[4, 6], default=4, help="Aggregate months into blocks of this size (mean); 4->3 cols, 6->2 cols")
-    parser.add_argument("--rows-from-months", action="store_true", help="After months aggregation, transpose so rows = aggregated months (3 or 2) and columns = features (6)")
+    parser = get_base_parser(
+        description="Run PBP on UCI Online Retail II per-customer matrices and report metrics."
+    )
+    parser = add_data_dir_arg(parser, default="./data/retail")
+    parser.add_argument("--rows", type=int, default=None,
+                        help="Optionally reduce rows (m) to this value via PCA before PBP")
+    parser.add_argument("--top-k-countries", type=int, default=6,
+                        help="Keep K most frequent countries; map others to 'Other'")
+    parser.add_argument("--months-agg", type=int, choices=[4, 6], default=4,
+                        help="Aggregate months into blocks of this size (mean)")
+    parser.add_argument("--rows-from-months", action="store_true",
+                        help="After months aggregation, transpose so rows = aggregated months")
+    parser.set_defaults(cv_splits=3)  # Retail uses 3 CV splits
     args = parser.parse_args()
-
-    X_mats, y, meta = load_online_retail_matrices(args.data_dir)
-    print(f"Loaded Retail: matrices={X_mats.shape}, labels={y.shape}, m×n={meta['matrix_shape']}")
-
-    # Optional: aggregate months into larger windows along the time axis (columns)
-    if args.months_agg is not None:
-        N, m, n = X_mats.shape
-        b = int(args.months_agg)
-        if n % b == 0:
-            X_mats = X_mats.reshape(N, m, n // b, b).mean(axis=3)
-            print(f"Aggregated months by {b}: new shape={X_mats.shape}")
-            if args.rows_from_months:
-                # Make rows equal to aggregated months; columns become features
-                X_mats = np.swapaxes(X_mats, 1, 2)
-                print(f"Transposed to rows-from-months: shape={X_mats.shape}")
-        else:
-            print(f"Warning: months ({n}) not divisible by {b}; skipping months aggregation")
-
-    # Optional: keep only top-K most frequent countries
-    if args.top_k_countries is not None and args.top_k_countries > 0:
-        k = int(args.top_k_countries)
-        counts = np.bincount(y)
-        top_ids = np.argsort(counts)[::-1][:k]
-        remap: Dict[int, int] = {int(cid): i for i, cid in enumerate(top_ids)}
-        other_id_new = k
-        y = np.array([remap.get(int(lbl), other_id_new) for lbl in y], dtype=int)
-
-        # Best-effort label names for reporting
-        id_to_country = {v: k for k, v in (meta.get("label_map") or {}).items()}
-        kept = [id_to_country.get(int(cid), str(cid)) for cid in top_ids]
-        print(f"Top-K countries kept (K={k}): {kept}; others mapped to 'Other'")
-
-    X_pbp = matrices_to_pbp_vectors(X_mats, agg=args.agg, rows_target=args.rows)
-    X_pbp = np.asarray(X_pbp)
-    print(f"PBP vectors: {X_pbp.shape} (agg={args.agg})")
-
-    # Optional: drop all-zero columns
-    non_zero_cols = ~(np.all(X_pbp == 0, axis=0))
-    if non_zero_cols.sum() != X_pbp.shape[1]:
-        X_pbp = X_pbp[:, non_zero_cols]
-
-    out_png = str(Path(args.results_dir) / f"retail_targets_pbp_{args.agg}.png")
-    scatter_features(X_pbp, y, out_png, title=f"Retail PBP (agg={args.agg}) - True Targets", label_names=meta.get("labels_map"))
-    print(f"Saved: {out_png}")
-
-    n_clusters = len(set(int(v) for v in y))
-    if n_clusters < 2:
-        print("Not enough classes for clustering metrics.")
-        return
-
-    # KMeans clustering
-    km = KMeans(n_clusters=n_clusters, n_init=10, random_state=0)
-    pred = km.fit_predict(X_pbp)
-
-    # Clustering metrics
-    def safe_cluster_metrics() -> Dict[str, Any]:
-        m: Dict[str, Any] = {
-            "v_measure": np.nan,
-            "adjusted_rand": np.nan,
-            "silhouette": np.nan,
-            "calinski_harabasz": np.nan,
-            "davies_bouldin": np.nan,
-            "inertia": np.nan,
-        }
-        try:
-            m["v_measure"] = float(v_measure_score(y, pred))
-            m["adjusted_rand"] = float(adjusted_rand_score(y, pred))
-        except Exception:
-            pass
-        try:
-            if len(set(pred)) >= 2 and len(set(pred)) < X_pbp.shape[0]:
-                m["silhouette"] = float(silhouette_score(X_pbp, pred))
-        except Exception:
-            pass
-        try:
-            m["calinski_harabasz"] = float(calinski_harabasz_score(X_pbp, pred))
-        except Exception:
-            pass
-        try:
-            m["davies_bouldin"] = float(davies_bouldin_score(X_pbp, pred))
-        except Exception:
-            pass
-        try:
-            m["inertia"] = float(getattr(km, "inertia_", np.nan))
-        except Exception:
-            pass
-        return m
-
-    # Separability metrics via CV
-    def safe_supervised_metrics(cv_splits: int = 3) -> Dict[str, Any]:
-        metrics: Dict[str, Any] = {
-            "linear_sep_cv": np.nan,
-            "cv_score": np.nan,
-            "margin_score": np.nan,
-            "boundary_complexity": np.nan,
-        }
-        if len(set(y)) < 2 or X_pbp.shape[0] <= cv_splits:
-            return metrics
-        cv = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=0)
-        try:
-            lin_svm = make_pipeline(StandardScaler(with_mean=True), LinearSVC(dual=False, max_iter=2000, random_state=0))
-            lin_scores = cross_val_score(lin_svm, X_pbp, y, cv=cv, scoring="accuracy", n_jobs=1)
-            metrics["linear_sep_cv"] = float(np.mean(lin_scores))
-        except Exception:
-            pass
-        try:
-            knn = make_pipeline(StandardScaler(with_mean=True), KNeighborsClassifier(n_neighbors=5))
-            knn_scores = cross_val_score(knn, X_pbp, y, cv=cv, scoring="accuracy", n_jobs=1)
-            metrics["cv_score"] = float(np.mean(knn_scores))
-        except Exception:
-            pass
-        try:
-            lr = make_pipeline(StandardScaler(with_mean=True), LogisticRegression(max_iter=200, n_jobs=1))
-            proba = cross_val_predict(lr, X_pbp, y, cv=cv, method="predict_proba", n_jobs=1)
-            if proba.ndim == 2 and proba.shape[1] >= 2:
-                part_sorted = np.sort(proba, axis=1)
-                margins = part_sorted[:, -1] - part_sorted[:, -2]
-                metrics["margin_score"] = float(np.mean(margins))
-        except Exception:
-            pass
-        try:
-            knn1 = make_pipeline(StandardScaler(with_mean=True), KNeighborsClassifier(n_neighbors=1))
-            knn1_scores = cross_val_score(knn1, X_pbp, y, cv=cv, scoring="accuracy", n_jobs=1)
-            metrics["boundary_complexity"] = float(1.0 - np.mean(knn1_scores))
-        except Exception:
-            pass
-        return metrics
-
-    cm = safe_cluster_metrics()
-    sm = safe_supervised_metrics(cv_splits=3)
-
-    print("Metrics (Retail, PBP)")
-    print(f"- agg={args.agg}, n_samples={X_pbp.shape[0]}, n_features={X_pbp.shape[1]}, n_clusters={n_clusters}")
-    print(f"- v_measure={cm['v_measure']}, adjusted_rand={cm['adjusted_rand']}")
-    print(f"- silhouette={cm['silhouette']}, calinski_harabasz={cm['calinski_harabasz']}, davies_bouldin={cm['davies_bouldin']}, inertia={cm['inertia']}")
-    print(f"- linear_sep_cv={sm['linear_sep_cv']}, cv_score={sm['cv_score']}, margin_score={sm['margin_score']}, boundary_complexity={sm['boundary_complexity']}")
+    
+    runner = RetailRunner()
+    runner.run(args)
 
 
 if __name__ == "__main__":
-    main() 
+    main()

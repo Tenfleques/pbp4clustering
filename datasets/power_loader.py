@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 import io
 import zipfile
@@ -7,6 +7,43 @@ import zipfile
 import numpy as np
 import pandas as pd
 import requests
+
+
+def _load_power_df_via_ucimlrepo() -> Optional[pd.DataFrame]:
+    """
+    Try loading the power dataset via ucimlrepo.
+    Returns a DataFrame with columns: Date, Time, Sub_metering_1/2/3 when successful; otherwise None.
+    """
+    try:
+        from ucimlrepo import fetch_ucirepo  # type: ignore
+    except Exception:
+        return None
+
+    try:
+        ds = fetch_ucirepo(name="Individual household electric power consumption")
+        df = ds.data.original.copy()  # type: ignore[attr-defined]
+        # Normalize expected columns
+        rename_map: Dict[str, str] = {}
+        for col in df.columns:
+            low = str(col).lower().strip()
+            if low == "date":
+                rename_map[col] = "Date"
+            elif low == "time":
+                rename_map[col] = "Time"
+            elif low == "sub_metering_1":
+                rename_map[col] = "Sub_metering_1"
+            elif low == "sub_metering_2":
+                rename_map[col] = "Sub_metering_2"
+            elif low == "sub_metering_3":
+                rename_map[col] = "Sub_metering_3"
+        if rename_map:
+            df = df.rename(columns=rename_map)
+        required = {"Date", "Time", "Sub_metering_1", "Sub_metering_2", "Sub_metering_3"}
+        if not required.issubset(set(df.columns)):
+            return None
+        return df
+    except Exception:
+        return None
 
 
 def load_household_power_matrices(
@@ -21,33 +58,39 @@ def load_household_power_matrices(
     Columns: 4-hour blocks (default) per day (6 blocks)
     Labels: day of week (0=Mon..6=Sun)
     """
-    Path(data_dir).mkdir(parents=True, exist_ok=True)
-    zip_path = Path(data_dir) / "household_power_consumption.zip"
-    txt_path = Path(data_dir) / "household_power_consumption.txt"
-    if not txt_path.exists():
-        if not zip_path.exists():
-            url = "https://archive.ics.uci.edu/ml/machine-learning-databases/00374/individual-household-electric-power-consumption.zip"
-            resp = requests.get(url, timeout=120)
-            resp.raise_for_status()
-            zip_path.write_bytes(resp.content)
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            for name in zf.namelist():
-                if name.endswith("household_power_consumption.txt"):
-                    zf.extract(name, path=data_dir)
-                    # Move to desired path if inside a folder
-                    src = Path(data_dir) / name
-                    src.rename(txt_path)
-                    break
+    # Prefer ucimlrepo when available
+    df = _load_power_df_via_ucimlrepo()
+    if df is None:
+        Path(data_dir).mkdir(parents=True, exist_ok=True)
+        zip_path = Path(data_dir) / "household_power_consumption.zip"
+        txt_path = Path(data_dir) / "household_power_consumption.txt"
+        if not txt_path.exists():
+            if not zip_path.exists():
+                url = "https://archive.ics.uci.edu/ml/machine-learning-databases/00374/individual-household-electric-power-consumption.zip"
+                resp = requests.get(url, timeout=120)
+                resp.raise_for_status()
+                zip_path.write_bytes(resp.content)
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                for name in zf.namelist():
+                    if name.endswith("household_power_consumption.txt"):
+                        zf.extract(name, path=data_dir)
+                        # Move to desired path if inside a folder
+                        src = Path(data_dir) / name
+                        src.rename(txt_path)
+                        break
 
-    # Read file
-    df = pd.read_csv(
-        txt_path,
-        sep=";",
-        na_values=['?'],
-        low_memory=False,
-    )
-    # Parse datetime
-    df["datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+        # Read file
+        df = pd.read_csv(
+            txt_path,
+            sep=";",
+            na_values=['?'],
+            low_memory=False,
+        )
+    # Parse datetime (robust to format differences)
+    try:
+        df["datetime"] = pd.to_datetime(df["Date"].astype(str) + " " + df["Time"].astype(str), format="%d/%m/%Y %H:%M:%S", errors="coerce")
+    except Exception:
+        df["datetime"] = pd.to_datetime(df["Date"].astype(str) + " " + df["Time"].astype(str), errors="coerce")
     df = df.dropna(subset=["datetime"]).reset_index(drop=True)
 
     # Keep required sub meterings and ensure numeric

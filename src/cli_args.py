@@ -57,6 +57,12 @@ def get_base_parser(description: Optional[str] = None) -> argparse.ArgumentParse
         help="Number of cross-validation splits for supervised metrics (default: 3)"
     )
     
+    parser.add_argument(
+        "--show-fig",
+        action="store_true",
+        help="Display plots interactively (in addition to saving them)"
+    )
+    
     return parser
 
 

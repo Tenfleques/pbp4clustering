@@ -1,143 +1,96 @@
 #!/usr/bin/env python3
-import argparse
-from typing import Any, Dict
-from pathlib import Path
+"""
+Refactored Abalone dataset runner with custom options.
+"""
 
-import numpy as np
+from src.base_runner import BaseRunner
+from src.cli_args import get_base_parser, add_data_dir_arg
 from datasets.abalone_loader import load_abalone_matrices
-from pbp_transform import matrices_to_pbp_vectors
-from visualize import scatter_features
-from sklearn.cluster import KMeans
-from sklearn.metrics import (
-    v_measure_score,
-    adjusted_rand_score,
-    silhouette_score,
-    calinski_harabasz_score,
-    davies_bouldin_score,
-)
-from sklearn.model_selection import StratifiedKFold, cross_val_score, cross_val_predict
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import LinearSVC
-from sklearn.neighbors import KNeighborsClassifier
+from pathlib import Path
+import numpy as np
+
+
+class AbaloneRunner(BaseRunner):
+    """Custom runner for Abalone dataset with matrix format options."""
+    
+    def __init__(self):
+        super().__init__("abalone")
+    
+    def load_data(self, args):
+        # Load Abalone dataset with specified option
+        X_mats, y, meta = load_abalone_matrices(args.data_dir, option=args.option)
+        # Store option in metadata for custom plot filename
+        meta['option'] = args.option
+        return X_mats, y, meta
+    
+    def run(self, args):
+        # Override run to customize plot filename with option
+        X_matrices, y, metadata = self.load_data(args)
+        print(f"Loaded {self.dataset_name}: matrices={X_matrices.shape}, labels={y.shape}")
+        if "matrix_shape" in metadata:
+            print(f"  Matrix shape: {metadata['matrix_shape']}")
+        
+        # Check if we have enough classes
+        n_clusters = len(set(int(v) for v in y))
+        if n_clusters < 2:
+            print("Not enough classes for clustering metrics.")
+            return
+        
+        # Continue with standard pipeline
+        from pbp_transform import matrices_to_pbp_vectors
+        from src.pipeline import filter_zero_columns, cluster_and_predict
+        from src.metrics import calculate_all_metrics
+        from src.utils import print_metrics_summary
+        from visualize import scatter_features
+        
+        X_pbp = matrices_to_pbp_vectors(X_matrices, agg=args.agg)
+        X_pbp = np.asarray(X_pbp)
+        print(f"PBP vectors: {X_pbp.shape} (agg={args.agg})")
+        
+        X_pbp = filter_zero_columns(X_pbp)
+        
+        if args.plot:
+            # Custom filename with option
+            out_png = str(Path(args.results_dir) / f"abalone_targets_pbp_{metadata['option']}_{args.agg}.png")
+            title = f"Abalone PBP (opt={metadata['option']}, agg={args.agg}) - Rings"
+            scatter_features(X_pbp, y, out_png, title=title)
+            print(f"Saved: {out_png}")
+        
+        pred, km = cluster_and_predict(X_pbp, n_clusters=n_clusters)
+        
+        cv_splits = getattr(args, "cv_splits", 5)
+        all_metrics = calculate_all_metrics(X_pbp, y, pred, km, cv_splits)
+        
+        print_metrics_summary(
+            all_metrics["cluster"],
+            all_metrics["supervised"],
+            {
+                "dataset_name": "Abalone",
+                "agg_func": args.agg,
+                "n_samples": X_pbp.shape[0],
+                "n_features": X_pbp.shape[1],
+                "n_clusters": n_clusters
+            }
+        )
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run PBP on Abalone (Option A 3x1, Option B 2x4) and report metrics/plot.")
-    parser.add_argument("--data-dir", default="./data/abalone", help="Directory containing abalone.csv")
-    parser.add_argument("--option", choices=["A", "B"], default="B", help="Matrix format option: A=(3x1), B=(2x4)")
-    parser.add_argument("--agg", default="sum", help="Aggregation function name for PBP")
-    parser.add_argument("--results-dir", default="./results", help="Directory to write plot outputs")
-    parser.add_argument("--plot", dest="plot", action="store_true", default=True, help="Generate scatter plot of PBP features")
-    parser.add_argument("--no-plot", dest="plot", action="store_false", help="Disable plotting")
+    # Setup argument parser
+    parser = get_base_parser(
+        description="Run PBP on Abalone (Option A 3x1, Option B 2x4) and report metrics/plot."
+    )
+    parser = add_data_dir_arg(parser, default="./data/abalone")
+    parser.add_argument(
+        "--option", choices=["A", "B"], default="B",
+        help="Matrix format option: A=(3x1), B=(2x4)"
+    )
+    parser.set_defaults(cv_splits=5)  # Abalone uses 5 CV splits
     args = parser.parse_args()
-
-    X_mats, y, meta = load_abalone_matrices(args.data_dir, option=args.option)
-    print(f"Loaded Abalone: matrices={X_mats.shape}, labels={y.shape}, m×n={meta['matrix_shape']}")
-
-    X_pbp = matrices_to_pbp_vectors(X_mats, agg=args.agg)
-    X_pbp = np.asarray(X_pbp)
-    print(f"PBP vectors: {X_pbp.shape} (agg={args.agg})")
-
-    non_zero_cols = ~(np.all(X_pbp == 0, axis=0))
-    if non_zero_cols.sum() != X_pbp.shape[1]:
-        X_pbp = X_pbp[:, non_zero_cols]
-
-    if args.plot:
-        out_png = str(Path(args.results_dir) / f"abalone_targets_pbp_{args.option}_{args.agg}.png")
-        scatter_features(X_pbp, y, out_png, title=f"Abalone PBP (opt={args.option}, agg={args.agg}) - Rings", label_names=None)
-        print(f"Saved: {out_png}")
-
-    # Clustering with many classes can be unstable; we still report metrics
-    n_clusters = len(set(int(v) for v in y))
-    if n_clusters < 2:
-        print("Not enough classes for clustering metrics.")
-        return
-
-    km = KMeans(n_clusters=n_clusters, n_init=10, random_state=0)
-    pred = km.fit_predict(X_pbp)
-
-    def safe_cluster_metrics() -> Dict[str, Any]:
-        m: Dict[str, Any] = {
-            "v_measure": np.nan,
-            "adjusted_rand": np.nan,
-            "silhouette": np.nan,
-            "calinski_harabasz": np.nan,
-            "davies_bouldin": np.nan,
-            "inertia": float(getattr(km, "inertia_", np.nan)),
-        }
-        try:
-            m["v_measure"] = float(v_measure_score(y, pred))
-            m["adjusted_rand"] = float(adjusted_rand_score(y, pred))
-        except Exception:
-            pass
-        try:
-            if len(set(pred)) >= 2 and len(set(pred)) < X_pbp.shape[0]:
-                m["silhouette"] = float(silhouette_score(X_pbp, pred))
-        except Exception:
-            pass
-        try:
-            m["calinski_harabasz"] = float(calinski_harabasz_score(X_pbp, pred))
-        except Exception:
-            pass
-        try:
-            m["davies_bouldin"] = float(davies_bouldin_score(X_pbp, pred))
-        except Exception:
-            pass
-        return m
-
-    def safe_supervised_metrics(cv_splits: int = 5) -> Dict[str, Any]:
-        metrics: Dict[str, Any] = {
-            "linear_sep_cv": np.nan,
-            "cv_score": np.nan,
-            "margin_score": np.nan,
-            "boundary_complexity": np.nan,
-        }
-        # For many-class targets, CV can be heavier; still attempt
-        if len(set(y)) < 2 or X_pbp.shape[0] <= cv_splits:
-            return metrics
-        cv = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=0)
-        try:
-            lin_svm = make_pipeline(StandardScaler(with_mean=True), LinearSVC(dual=False, max_iter=2000, random_state=0))
-            lin_scores = cross_val_score(lin_svm, X_pbp, y, cv=cv, scoring="accuracy", n_jobs=1)
-            metrics["linear_sep_cv"] = float(np.mean(lin_scores))
-        except Exception:
-            pass
-        try:
-            knn = make_pipeline(StandardScaler(with_mean=True), KNeighborsClassifier(n_neighbors=5))
-            knn_scores = cross_val_score(knn, X_pbp, y, cv=cv, scoring="accuracy", n_jobs=1)
-            metrics["cv_score"] = float(np.mean(knn_scores))
-        except Exception:
-            pass
-        try:
-            lr = make_pipeline(StandardScaler(with_mean=True), LogisticRegression(max_iter=200, n_jobs=1, multi_class="auto"))
-            proba = cross_val_predict(lr, X_pbp, y, cv=cv, method="predict_proba", n_jobs=1)
-            if proba.ndim == 2 and proba.shape[1] >= 2:
-                part_sorted = np.sort(proba, axis=1)
-                margins = part_sorted[:, -1] - part_sorted[:, -2]
-                metrics["margin_score"] = float(np.mean(margins))
-        except Exception:
-            pass
-        try:
-            knn1 = make_pipeline(StandardScaler(with_mean=True), KNeighborsClassifier(n_neighbors=1))
-            knn1_scores = cross_val_score(knn1, X_pbp, y, cv=cv, scoring="accuracy", n_jobs=1)
-            metrics["boundary_complexity"] = float(1.0 - np.mean(knn1_scores))
-        except Exception:
-            pass
-        return metrics
-
-    cm = safe_cluster_metrics()
-    sm = safe_supervised_metrics(cv_splits=5)
-
-    print("Metrics (Abalone, PBP)")
-    print(f"- option={args.option}, agg={args.agg}, n_samples={X_pbp.shape[0]}, n_features={X_pbp.shape[1]}, n_clusters={n_clusters}")
-    print(f"- v_measure={cm['v_measure']}, adjusted_rand={cm['adjusted_rand']}")
-    print(f"- silhouette={cm['silhouette']}, calinski_harabasz={cm['calinski_harabasz']}, davies_bouldin={cm['davies_bouldin']}, inertia={cm['inertia']}")
-    print(f"- linear_sep_cv={sm['linear_sep_cv']}, cv_score={sm['cv_score']}, margin_score={sm['margin_score']}, boundary_complexity={sm['boundary_complexity']}")
+    
+    # Create and run the pipeline
+    runner = AbaloneRunner()
+    runner.run(args)
 
 
 if __name__ == "__main__":
     main()
-
-

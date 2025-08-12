@@ -100,22 +100,22 @@ def compare_metrics(original: Dict[str, float], refactored: Dict[str, float], to
 
 
 def test_runner(runner_name: str, args: str = "--agg sum --no-plot", verbose: bool = False) -> bool:
-    """Test a single runner by comparing original vs refactored."""
+    """Test a single runner by comparing original vs current (refactored)."""
     print(f"\n{'='*60}")
     print(f"Testing: {runner_name}")
     print(f"Arguments: {args}")
     print('='*60)
     
-    original_script = f"run_{runner_name}.py"
-    refactored_script = f"run_{runner_name}_refactored.py"
+    original_script = f"backup_original_scripts/run_{runner_name}.py"
+    current_script = f"run_{runner_name}.py"
     
     # Check if both scripts exist
     if not Path(original_script).exists():
         print(f"❌ Original script not found: {original_script}")
         return False
     
-    if not Path(refactored_script).exists():
-        print(f"❌ Refactored script not found: {refactored_script}")
+    if not Path(current_script).exists():
+        print(f"❌ Current script not found: {current_script}")
         return False
     
     # Run original
@@ -132,19 +132,19 @@ def test_runner(runner_name: str, args: str = "--agg sum --no-plot", verbose: bo
     if verbose:
         print(f"Original metrics extracted: {len(orig_metrics)} values")
     
-    # Run refactored
-    print(f"📊 Running refactored: {refactored_script}")
-    ref_success, ref_stdout, ref_stderr = run_command(f".venv/bin/python {refactored_script} {args}")
+    # Run current (refactored)
+    print(f"📊 Running current (refactored): {current_script}")
+    ref_success, ref_stdout, ref_stderr = run_command(f".venv/bin/python {current_script} {args}")
     
     if not ref_success:
-        print(f"❌ Refactored failed to run")
+        print(f"❌ Current (refactored) failed to run")
         if verbose:
             print(f"Error: {ref_stderr}")
         return False
     
     ref_metrics = extract_metrics(ref_stdout)
     if verbose:
-        print(f"Refactored metrics extracted: {len(ref_metrics)} values")
+        print(f"Current metrics extracted: {len(ref_metrics)} values")
     
     # Compare metrics
     print(f"\n📈 Comparing metrics:")
@@ -172,10 +172,10 @@ def main():
     
     # Determine which runners to test
     if args.all:
-        # Find all refactored runners
-        refactored_files = list(Path(".").glob("run_*_refactored.py"))
-        runners = [f.stem.replace("run_", "").replace("_refactored", "") 
-                  for f in refactored_files]
+        # Find all current runners that have backups
+        backup_files = list(Path("backup_original_scripts").glob("run_*.py"))
+        runners = [f.stem.replace("run_", "") 
+                  for f in backup_files if f.stem not in ["run_har", "run_iris"]]
     elif args.runners:
         runners = args.runners
     else:

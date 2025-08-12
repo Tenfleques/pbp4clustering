@@ -306,3 +306,7 @@ config.ini
 secrets.json
 .env
 articles
+batch_results
+draft
+CLAUDE.
+backup_original_scripts

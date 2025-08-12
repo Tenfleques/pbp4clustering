@@ -26,17 +26,23 @@ def bin_encoder(v, l):
     return ba2int(y)
 
 # Function to create П matrix
-def create_perm(C: np.array):
+def create_perm(C: np.array, sort_func=None):
     """
     Generate a permutation indicator matrix based on the column-wise sorting of a given numpy array.
 
     Parameters:
         C (numpy.ndarray): The input numpy array.
+        sort_func (callable, optional): Sorting function to use. If None, uses default ascending sort.
 
     Returns:
         numpy.ndarray: The permutation indicator matrix.
     """
-    perm = C.argsort(kind='quick', axis=0)
+    if sort_func is None:
+        # Default behavior - ascending sort
+        perm = C.argsort(kind='quick', axis=0)
+    else:
+        # Use provided sorting function
+        perm = sort_func(C)
     return perm
 
 def calculate_degree(y):
@@ -136,18 +142,20 @@ def decode_var(y, BIT_ORDER=BIT_ORDER):
     return "y" + "y".join([sub_s[i+1] for i in indices])
 
 # Driver function to create a whole pBp
-def create_pbp(c: np.array, agg_func: Callable[[pd.Series], Any] = lambda x: x.sum()):
+def create_pbp(c: np.array, agg_func: Callable[[pd.Series], Any] = lambda x: x.sum(), sort_func=None):
     """
     Create a polynomial basis representation (pBp) based on the given matrix C.
 
     Args:
         c (numpy.ndarray): The input matrix C.
+        agg_func (callable, optional): Aggregation function to use. Defaults to sum.
+        sort_func (callable, optional): Sorting function to use. Defaults to ascending sort.
 
     Returns:
         pandas.DataFrame: A DataFrame containing the polynomial basis representation.
     """
     assert len(c.shape) == 2
-    perm_c = create_perm(c)
+    perm_c = create_perm(c, sort_func)
     coeffs_c = create_coeffs_matrix(c, perm_c)
     y = create_variable_matrix(c, perm_c)
     pBp = reduce_pbp_pandas(coeffs_c, y, agg_func)
@@ -184,18 +192,20 @@ def to_string(row):
     return f'{row["coeffs"] if row["coeffs"] > 1 else "" }{row["y_str"]}'
 
 # Driver function to create and truncate pBp
-def trunc_driver(c, p_list):
+def trunc_driver(c, p_list, agg_func=None, sort_func=None):
     """
     Truncates the polynomial basis representation (pBp) for a given input matrix C and a list of cutoff values p.
 
     Parameters:
         c (numpy.array): The input matrix C.
         p_list (list): A list of cutoff values p.
+        agg_func (callable, optional): Aggregation function to use. Defaults to sum.
+        sort_func (callable, optional): Sorting function to use. Defaults to ascending sort.
 
     Returns:
         None
     """
-    pBp = create_pbp(c)
+    pBp = create_pbp(c, agg_func, sort_func)
     print("Result pBp")
     polynomial = " + ".join(pBp.apply(to_string, axis=1))
     print(polynomial)
@@ -208,11 +218,19 @@ def trunc_driver(c, p_list):
         print("=" * 100)
 
 
-def pbp_vector(c: np.array, agg_func: Callable[[pd.Series], Any] = lambda x: x.sum()):
+def pbp_vector(c: np.array, agg_func: Callable[[pd.Series], Any] = lambda x: x.sum(), sort_func=None):
     """
     Creates a polynomial basis representation (pBp) for a given input matrix C.
+    
+    Args:
+        c (numpy.ndarray): The input matrix C.
+        agg_func (callable, optional): Aggregation function to use. Defaults to sum.
+        sort_func (callable, optional): Sorting function to use. Defaults to ascending sort.
+    
+    Returns:
+        numpy.ndarray: The PBP vector representation.
     """
-    pBp = create_pbp(c, agg_func)
+    pBp = create_pbp(c, agg_func, sort_func)
     vector = np.zeros(2**c.shape[0] - 1, dtype=c.dtype)
     for index, row in pBp.iterrows():
         vector[row["y"]] = row["coeffs"]
@@ -240,17 +258,18 @@ def get_pbp_from_vector(vector: np.array):
     return pbp
 
 if __name__ == "__main__":
-    # c = np.array([
-    #     [7, 8, 2, 10, 3],
-    #     [4, 12, 1, 8, 4],
-    #     [5, 3, 0, 6, 9],
-    #     [9, 6, 7, 1, 5]
-    # ])
+    c = np.array([
+        [7, 8, 2, 10, 3],
+        [4, 12, 1, 8, 4],
+        [5, 3, 0, 6, 9],
+        [9, 6, 7, 1, 5]
+    ])
 
-    # pBp = create_pbp(c)
-    # print(pBp)
-    # v = pbp_vector(c)
-    # print(v)
+    pBp = create_pbp(c)
+    print(pBp)
+    v = pbp_vector(c)
+    print(v)
+    print(get_pbp_from_vector(v))
     
 
     # c = np.array([

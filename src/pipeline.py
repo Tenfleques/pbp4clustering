@@ -4,12 +4,13 @@ Provides common data processing and clustering operations.
 """
 
 from pathlib import Path
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, List
 import numpy as np
 from sklearn.cluster import KMeans
 from pbp_transform import matrices_to_pbp_vectors
 from visualize import scatter_features
 from .metrics import calculate_all_metrics
+from .core import get_pbp_from_vector
 
 
 def filter_zero_columns(X: np.ndarray) -> np.ndarray:
@@ -55,7 +56,11 @@ def run_clustering_pipeline(
     plot: bool = True,
     dataset_name: str = "dataset",
     label_names: Optional[Dict[int, str]] = None,
-    cv_splits: int = 3
+    cv_splits: int = 3,
+    show_fig: bool = False,
+    feature_names: Optional[List[str]] = None,
+    plot_separators: bool = False,
+    sort_func: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run the complete clustering pipeline on matrix data.
@@ -74,11 +79,22 @@ def run_clustering_pipeline(
         Dictionary containing all results and metrics
     """
     # Transform to PBP vectors
-    X_pbp = matrices_to_pbp_vectors(X_matrices, agg=agg_func)
-    X_pbp = np.asarray(X_pbp)
-    
-    # Filter zero columns
-    X_pbp = filter_zero_columns(X_pbp)
+    X_pbp_full = matrices_to_pbp_vectors(X_matrices, agg=agg_func, sort=sort_func)
+    X_pbp_full = np.asarray(X_pbp_full)
+
+    # Build PBP basis labels using get_pbp_from_vector BEFORE dropping zero columns
+    # Use presence (any non-zero across samples) to avoid cancellation from summing
+    union_vec = (X_pbp_full != 0).any(axis=0).astype(X_pbp_full.dtype)
+    pbp_df = get_pbp_from_vector(union_vec)
+    # Map y index to y_str
+    y_to_str = {int(row["y"]): str(row.get("y_str", "")) for _, row in pbp_df.iterrows()}
+    vec_len = X_pbp_full.shape[1]
+    pbp_feature_names: List[str] = [y_to_str.get(j, "∅") for j in range(vec_len)]
+
+    # Filter zero columns and apply same mask to feature names
+    non_zero_cols = ~(np.all(X_pbp_full == 0, axis=0))
+    X_pbp = X_pbp_full[:, non_zero_cols]
+    pbp_feature_names = [n for n, keep in zip(pbp_feature_names, non_zero_cols) if keep]
     
     # Visualize if requested
     if plot:
@@ -86,7 +102,10 @@ def run_clustering_pipeline(
         scatter_features(
             X_pbp, y, out_png, 
             title=f"{dataset_name.title()} PBP (agg={agg_func})",
-            label_names=label_names
+            label_names=label_names,
+            show_fig=show_fig,
+            feature_names=pbp_feature_names,
+            plot_separators=plot_separators,
         )
     
     # Clustering

@@ -10,21 +10,21 @@ if [ -z "$RUNNER" ]; then
     echo "Usage: $0 <runner_name> [agg_function]"
     echo "Example: $0 iris2 sum"
     echo ""
-    echo "Available refactored runners:"
-    ls run_*_refactored.py 2>/dev/null | sed 's/run_//g' | sed 's/_refactored.py//g' | sort
+    echo "Available runners:"
+    ls backup_original_scripts/run_*.py 2>/dev/null | sed 's/.*run_//g' | sed 's/.py//g' | grep -v har | grep -v iris | sort
     exit 1
 fi
 
-ORIGINAL="run_${RUNNER}.py"
-REFACTORED="run_${RUNNER}_refactored.py"
+CURRENT="run_${RUNNER}.py"
+ORIGINAL="backup_original_scripts/run_${RUNNER}.py"
 
 if [ ! -f "$ORIGINAL" ]; then
     echo "❌ Original file not found: $ORIGINAL"
     exit 1
 fi
 
-if [ ! -f "$REFACTORED" ]; then
-    echo "❌ Refactored file not found: $REFACTORED"
+if [ ! -f "$CURRENT" ]; then
+    echo "❌ Current file not found: $CURRENT"
     exit 1
 fi
 
@@ -42,11 +42,11 @@ echo "📊 Running ORIGINAL: $ORIGINAL"
 echo "------------------------------------------"
 .venv/bin/python "$ORIGINAL" --agg "$AGG" --no-plot 2>&1 | tee "$ORIG_OUT" | grep -E "(Loaded|PBP vectors|Metrics|v_measure|adjusted_rand|silhouette|calinski|davies|linear_sep|cv_score|margin_score|boundary)"
 
-# Run refactored
+# Run current (refactored)
 echo ""
-echo "📊 Running REFACTORED: $REFACTORED"
+echo "📊 Running CURRENT (refactored): $CURRENT"
 echo "------------------------------------------"
-.venv/bin/python "$REFACTORED" --agg "$AGG" --no-plot 2>&1 | tee "$REF_OUT" | grep -E "(Loaded|PBP vectors|Metrics|v_measure|adjusted_rand|silhouette|calinski|davies|linear_sep|cv_score|margin_score|boundary)"
+.venv/bin/python "$CURRENT" --agg "$AGG" --no-plot 2>&1 | tee "$REF_OUT" | grep -E "(Loaded|PBP vectors|Metrics|v_measure|adjusted_rand|silhouette|calinski|davies|linear_sep|cv_score|margin_score|boundary)"
 
 # Compare key metrics
 echo ""
@@ -59,7 +59,7 @@ echo "Original metrics:"
 grep -E "(v_measure|adjusted_rand|silhouette|calinski|davies|linear_sep|cv_score|margin_score|boundary)" "$ORIG_OUT" | tail -4
 
 echo ""
-echo "Refactored metrics:"
+echo "Current (refactored) metrics:"
 grep -E "(v_measure|adjusted_rand|silhouette|calinski|davies|linear_sep|cv_score|margin_score|boundary)" "$REF_OUT" | tail -4
 
 # Check if outputs are identical for metrics lines
